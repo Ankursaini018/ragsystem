@@ -26,7 +26,7 @@ const Index = () => {
       <aside
         className={cn(
           "fixed lg:relative z-20 h-full bg-sidebar border-r border-sidebar-border transition-all duration-300",
-          sidebarOpen ? "w-80 translate-x-0" : "w-0 -translate-x-full lg:translate-x-0 lg:w-0"
+          sidebarOpen ? "w-80 translate-x-0" : "w-0 -translate-x-full"
         )}
       >
         <div className="flex flex-col h-full w-80 overflow-hidden">
