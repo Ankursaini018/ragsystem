@@ -96,15 +96,37 @@ export function DocumentUpload({ onUploadComplete }: DocumentUploadProps) {
     }
   };
 
+  const extractPdfText = async (file: File): Promise<string> => {
+    const pdfjsLib = await import("pdfjs-dist");
+    pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+    
+    const arrayBuffer = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+    
+    let fullText = "";
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page = await pdf.getPage(i);
+      const textContent = await page.getTextContent();
+      const pageText = textContent.items
+        .map((item: any) => item.str)
+        .join(" ");
+      fullText += pageText + "\n\n";
+    }
+    
+    return fullText.trim();
+  };
+
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Only support text files for now
-    if (!file.type.includes("text") && !file.name.endsWith(".txt") && !file.name.endsWith(".md")) {
+    const isPdf = file.type === "application/pdf" || file.name.endsWith(".pdf");
+    const isText = file.type.includes("text") || file.name.endsWith(".txt") || file.name.endsWith(".md");
+
+    if (!isPdf && !isText) {
       toast({
         title: "Unsupported file type",
-        description: "Currently only .txt and .md files are supported.",
+        description: "Supported formats: PDF, TXT, MD",
         variant: "destructive",
       });
       return;
@@ -112,8 +134,19 @@ export function DocumentUpload({ onUploadComplete }: DocumentUploadProps) {
 
     setIsUploading(true);
     try {
-      const content = await file.text();
-      const result = await ingestDocument(file.name, content, "text");
+      let content: string;
+      
+      if (isPdf) {
+        content = await extractPdfText(file);
+      } else {
+        content = await file.text();
+      }
+
+      if (!content.trim()) {
+        throw new Error("No text content found in file");
+      }
+
+      const result = await ingestDocument(file.name, content, isPdf ? "pdf" : "text");
       setUploadResult({ title: file.name, chunks: result.chunksCreated });
       toast({
         title: "File uploaded",
@@ -211,7 +244,7 @@ export function DocumentUpload({ onUploadComplete }: DocumentUploadProps) {
           <input
             ref={fileInputRef}
             type="file"
-            accept=".txt,.md,text/*"
+            accept=".pdf,.txt,.md,application/pdf,text/*"
             onChange={handleFileUpload}
             className="hidden"
           />
@@ -230,7 +263,7 @@ export function DocumentUpload({ onUploadComplete }: DocumentUploadProps) {
               <div className="flex flex-col items-center gap-1">
                 <Upload className="w-5 h-5 text-muted-foreground" />
                 <span className="text-xs text-muted-foreground">
-                  Click to upload .txt or .md files
+                  Click to upload PDF, TXT, or MD files
                 </span>
               </div>
             )}
