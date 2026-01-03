@@ -27,41 +27,12 @@ serve(async (req) => {
 
     const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!);
 
-    // Step 1: Generate embedding for the query
-    console.log("Generating query embedding...");
-    const embeddingResponse = await fetch("https://ai.gateway.lovable.dev/v1/embeddings", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "text-embedding-3-small",
-        input: message,
-        dimensions: 768,
-      }),
-    });
-
-    if (!embeddingResponse.ok) {
-      const errorText = await embeddingResponse.text();
-      console.error("Embedding error:", errorText);
-      throw new Error(`Embedding API error: ${embeddingResponse.status}`);
-    }
-
-    const embeddingData = await embeddingResponse.json();
-    const queryEmbedding = embeddingData.data?.[0]?.embedding;
-
-    if (!queryEmbedding) {
-      throw new Error("Failed to generate embedding");
-    }
-
-    // Step 2: Search for similar chunks
-    console.log("Searching for similar chunks...");
+    // Step 1: Search for similar chunks using full-text search
+    console.log("Searching for relevant chunks...");
     const { data: chunks, error: searchError } = await supabase.rpc(
-      "search_similar_chunks",
+      "search_chunks_fulltext",
       {
-        query_embedding: JSON.stringify(queryEmbedding),
-        match_threshold: 0.3,
+        search_query: message,
         match_count: 5,
       }
     );
@@ -72,7 +43,7 @@ serve(async (req) => {
 
     console.log("Found chunks:", chunks?.length || 0);
 
-    // Step 3: Build context from retrieved chunks
+    // Step 2: Build context from retrieved chunks
     let context = "";
     const citations: Array<{
       chunkId: string;
@@ -92,14 +63,21 @@ serve(async (req) => {
 
       const docMap = new Map(documents?.map((d: { id: string; title: string; source_type: string; source_url: string | null }) => [d.id, d]) || []);
 
-      chunks.forEach((chunk: { id: string; document_id: string; content: string; similarity: number; metadata: Record<string, unknown> }, idx: number) => {
+      // Normalize ranks to 0-1 range for display
+      const maxRank = Math.max(...chunks.map((c: { rank: number }) => c.rank));
+      
+      chunks.forEach((chunk: { id: string; document_id: string; content: string; rank: number; metadata: Record<string, unknown> }, idx: number) => {
         const doc = docMap.get(chunk.document_id) as { title: string; source_type: string; source_url: string | null } | undefined;
         context += `[Source ${idx + 1}: ${doc?.title || "Unknown"}]\n${chunk.content}\n\n`;
+        
+        // Normalize rank to similarity score (0-1)
+        const normalizedScore = maxRank > 0 ? Math.min(chunk.rank / maxRank, 1) : 0.5;
+        
         citations.push({
           chunkId: chunk.id,
           documentId: chunk.document_id,
           content: chunk.content.substring(0, 200) + (chunk.content.length > 200 ? "..." : ""),
-          similarity: chunk.similarity,
+          similarity: normalizedScore,
           metadata: {
             title: doc?.title,
             sourceType: doc?.source_type,
@@ -114,9 +92,9 @@ serve(async (req) => {
     const avgSimilarity = citations.length > 0 
       ? citations.reduce((sum, c) => sum + c.similarity, 0) / citations.length 
       : 0;
-    const hasRelevantContext = avgSimilarity > 0.5;
+    const hasRelevantContext = citations.length > 0 && avgSimilarity > 0.3;
 
-    // Step 4: Generate response with LLM
+    // Step 3: Generate response with LLM
     console.log("Generating response with LLM...");
     
     const systemPrompt = `You are a helpful RAG (Retrieval-Augmented Generation) assistant that answers questions based on provided context from documents.
@@ -128,7 +106,7 @@ IMPORTANT RULES:
 4. If the question is ambiguous, ask for clarification.
 5. Structure your answers clearly with paragraphs when appropriate.
 
-${context ? `RETRIEVED CONTEXT:\n${context}` : "NO CONTEXT AVAILABLE - The document database appears to be empty or no relevant documents were found."}`;
+${context ? `RETRIEVED CONTEXT:\n${context}` : "NO CONTEXT AVAILABLE - The document database appears to be empty or no relevant documents were found for this query."}`;
 
     const llmResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -168,7 +146,6 @@ ${context ? `RETRIEVED CONTEXT:\n${context}` : "NO CONTEXT AVAILABLE - The docum
 
     // Create a TransformStream to add metadata to the stream
     const encoder = new TextEncoder();
-    const decoder = new TextDecoder();
     
     // Send initial metadata
     const metadataEvent = `data: ${JSON.stringify({
