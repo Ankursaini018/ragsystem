@@ -39,13 +39,81 @@ function cleanText(text: string): string {
     .replace(/\r\n/g, '\n')
     .replace(/\n{3,}/g, '\n\n')
     .replace(/\s{2,}/g, ' ')
-    .replace(/[^\x20-\x7E\n]/g, ' ') // Replace non-printable chars with space
+    .replace(/[^\x20-\x7E\n]/g, ' ')
     .trim();
 }
 
 // Estimate token count (rough approximation: ~4 chars per token)
 function estimateTokens(text: string): number {
   return Math.ceil(text.length / 4);
+}
+
+// Extract text from PDF using pdf-parse compatible approach
+async function extractPdfText(base64Data: string): Promise<string> {
+  try {
+    // Decode base64 to binary
+    const binaryString = atob(base64Data);
+    const bytes = new Uint8Array(binaryString.length);
+    for (let i = 0; i < binaryString.length; i++) {
+      bytes[i] = binaryString.charCodeAt(i);
+    }
+
+    // Simple PDF text extraction - find text between stream/endstream and extract readable content
+    const pdfText = new TextDecoder('latin1').decode(bytes);
+    
+    // Extract text from PDF streams (basic extraction)
+    const textParts: string[] = [];
+    
+    // Method 1: Look for text in parentheses (PDF string literals)
+    const stringMatches = pdfText.matchAll(/\(([^)]+)\)/g);
+    for (const match of stringMatches) {
+      const text = match[1]
+        .replace(/\\n/g, '\n')
+        .replace(/\\r/g, '')
+        .replace(/\\t/g, ' ')
+        .replace(/\\\(/g, '(')
+        .replace(/\\\)/g, ')')
+        .replace(/\\\\/g, '\\');
+      if (text.length > 2 && /[a-zA-Z]{2,}/.test(text)) {
+        textParts.push(text);
+      }
+    }
+    
+    // Method 2: Look for BT...ET text blocks with Tj/TJ operators
+    const textBlockMatches = pdfText.matchAll(/BT\s*([\s\S]*?)\s*ET/g);
+    for (const match of textBlockMatches) {
+      const block = match[1];
+      // Extract text from Tj operators
+      const tjMatches = block.matchAll(/\(([^)]*)\)\s*Tj/g);
+      for (const tj of tjMatches) {
+        const text = tj[1].replace(/\\[nrt]/g, ' ');
+        if (text.length > 1) {
+          textParts.push(text);
+        }
+      }
+      // Extract text from TJ arrays
+      const arrayMatches = block.matchAll(/\[(.*?)\]\s*TJ/g);
+      for (const arr of arrayMatches) {
+        const parts = arr[1].matchAll(/\(([^)]*)\)/g);
+        for (const part of parts) {
+          if (part[1].length > 0) {
+            textParts.push(part[1]);
+          }
+        }
+      }
+    }
+    
+    const extractedText = textParts.join(' ');
+    
+    if (extractedText.length < 50) {
+      throw new Error("Could not extract sufficient text from PDF. The PDF may be scanned/image-based.");
+    }
+    
+    return extractedText;
+  } catch (error) {
+    console.error("PDF extraction error:", error);
+    throw new Error("Failed to extract text from PDF. Please try uploading a text-based PDF or paste the content as text.");
+  }
 }
 
 serve(async (req) => {
@@ -62,8 +130,17 @@ serve(async (req) => {
 
     const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!);
 
+    let textContent = content;
+    
+    // If PDF, extract text from base64
+    if (sourceType === "pdf") {
+      console.log("Extracting text from PDF...");
+      textContent = await extractPdfText(content);
+      console.log("Extracted PDF text length:", textContent.length);
+    }
+
     // Clean the text
-    const cleanedContent = cleanText(content);
+    const cleanedContent = cleanText(textContent);
     console.log("Cleaned content length:", cleanedContent.length);
 
     if (cleanedContent.length < 10) {
@@ -79,7 +156,7 @@ serve(async (req) => {
         source_url: sourceUrl,
         content: cleanedContent,
         metadata: {
-          originalLength: content.length,
+          originalLength: sourceType === "pdf" ? textContent.length : content.length,
           cleanedLength: cleanedContent.length,
         },
       })
@@ -97,7 +174,7 @@ serve(async (req) => {
     const chunks = chunkText(cleanedContent);
     console.log("Created chunks:", chunks.length);
 
-    // Create chunk records (no embeddings - using full-text search instead)
+    // Create chunk records
     const chunkRecords = chunks.map((chunkContent, idx) => ({
       document_id: document.id,
       content: chunkContent,
@@ -108,7 +185,7 @@ serve(async (req) => {
       },
     }));
 
-    // Insert all chunks (the trigger will auto-generate search_vector)
+    // Insert all chunks
     console.log("Inserting chunks:", chunkRecords.length);
     const { error: chunksError } = await supabase
       .from("document_chunks")
