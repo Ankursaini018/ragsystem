@@ -85,6 +85,7 @@ export type Database = {
           embedding: string | null
           id: string
           metadata: Json | null
+          search_vector: unknown
           token_count: number | null
         }
         Insert: {
@@ -95,6 +96,7 @@ export type Database = {
           embedding?: string | null
           id?: string
           metadata?: Json | null
+          search_vector?: unknown
           token_count?: number | null
         }
         Update: {
@@ -105,6 +107,7 @@ export type Database = {
           embedding?: string | null
           id?: string
           metadata?: Json | null
+          search_vector?: unknown
           token_count?: number | null
         }
         Relationships: [
@@ -155,6 +158,17 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      search_chunks_fulltext: {
+        Args: { match_count?: number; search_query: string }
+        Returns: {
+          chunk_index: number
+          content: string
+          document_id: string
+          id: string
+          metadata: Json
+          rank: number
+        }[]
+      }
       search_similar_chunks: {
         Args: {
           match_count?: number

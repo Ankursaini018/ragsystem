@@ -39,7 +39,7 @@ function cleanText(text: string): string {
     .replace(/\r\n/g, '\n')
     .replace(/\n{3,}/g, '\n\n')
     .replace(/\s{2,}/g, ' ')
-    .replace(/[^\x20-\x7E\n]/g, '') // Remove non-printable chars
+    .replace(/[^\x20-\x7E\n]/g, ' ') // Replace non-printable chars with space
     .trim();
 }
 
@@ -57,19 +57,18 @@ serve(async (req) => {
     const { title, content, sourceType, sourceUrl } = await req.json();
     console.log("Ingesting document:", title, "Type:", sourceType);
 
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-
-    if (!LOVABLE_API_KEY) {
-      throw new Error("LOVABLE_API_KEY is not configured");
-    }
 
     const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!);
 
     // Clean the text
     const cleanedContent = cleanText(content);
     console.log("Cleaned content length:", cleanedContent.length);
+
+    if (cleanedContent.length < 10) {
+      throw new Error("Document content is too short to process");
+    }
 
     // Create document record
     const { data: document, error: docError } = await supabase
@@ -98,62 +97,18 @@ serve(async (req) => {
     const chunks = chunkText(cleanedContent);
     console.log("Created chunks:", chunks.length);
 
-    // Generate embeddings for all chunks in batches
-    const batchSize = 10;
-    const chunkRecords: Array<{
-      document_id: string;
-      content: string;
-      chunk_index: number;
-      token_count: number;
-      embedding: number[];
-      metadata: Record<string, unknown>;
-    }> = [];
+    // Create chunk records (no embeddings - using full-text search instead)
+    const chunkRecords = chunks.map((chunkContent, idx) => ({
+      document_id: document.id,
+      content: chunkContent,
+      chunk_index: idx,
+      token_count: estimateTokens(chunkContent),
+      metadata: {
+        wordCount: chunkContent.split(/\s+/).length,
+      },
+    }));
 
-    for (let i = 0; i < chunks.length; i += batchSize) {
-      const batch = chunks.slice(i, i + batchSize);
-      console.log(`Processing batch ${i / batchSize + 1}/${Math.ceil(chunks.length / batchSize)}`);
-
-      const embeddingResponse = await fetch("https://ai.gateway.lovable.dev/v1/embeddings", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${LOVABLE_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: "text-embedding-3-small",
-          input: batch,
-          dimensions: 768,
-        }),
-      });
-
-      if (!embeddingResponse.ok) {
-        const errorText = await embeddingResponse.text();
-        console.error("Embedding error:", errorText);
-        throw new Error(`Embedding API error: ${embeddingResponse.status}`);
-      }
-
-      const embeddingData = await embeddingResponse.json();
-      
-      batch.forEach((chunkContent, batchIdx) => {
-        const globalIdx = i + batchIdx;
-        const embedding = embeddingData.data?.[batchIdx]?.embedding;
-        
-        if (embedding) {
-          chunkRecords.push({
-            document_id: document.id,
-            content: chunkContent,
-            chunk_index: globalIdx,
-            token_count: estimateTokens(chunkContent),
-            embedding,
-            metadata: {
-              wordCount: chunkContent.split(/\s+/).length,
-            },
-          });
-        }
-      });
-    }
-
-    // Insert all chunks
+    // Insert all chunks (the trigger will auto-generate search_vector)
     console.log("Inserting chunks:", chunkRecords.length);
     const { error: chunksError } = await supabase
       .from("document_chunks")
