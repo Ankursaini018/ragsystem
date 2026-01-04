@@ -25,11 +25,11 @@ const Index = () => {
       {/* Sidebar */}
       <aside
         className={cn(
-          "fixed lg:relative z-20 h-full bg-sidebar border-r border-sidebar-border transition-all duration-300",
-          sidebarOpen ? "w-80 translate-x-0" : "w-0 -translate-x-full"
+          "fixed lg:relative z-20 h-full min-w-0 overflow-hidden bg-sidebar border-r border-sidebar-border transition-all duration-300 will-change-transform",
+          sidebarOpen ? "w-80 translate-x-0" : "w-0 -translate-x-[20rem]"
         )}
       >
-        <div className="flex flex-col h-full w-80 overflow-hidden">
+        <div className="flex flex-col h-full w-full overflow-hidden">
           {/* Sidebar header */}
           <div className="p-4 border-b border-sidebar-border">
             <div className="flex items-center justify-between">
@@ -82,7 +82,7 @@ const Index = () => {
       {/* Main content */}
       <main className="flex-1 flex flex-col min-w-0 relative z-0">
         {/* Header */}
-        <header className="flex items-center justify-between p-4 border-b border-border/50">
+        <header className="relative z-30 flex items-center justify-between p-4 border-b border-border/50">
           <div className="flex items-center gap-3">
             <Button
               variant="ghost"
