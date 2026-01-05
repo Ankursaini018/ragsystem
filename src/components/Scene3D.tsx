@@ -1,7 +1,26 @@
-import { useRef, useMemo } from "react";
-import { Canvas, useFrame } from "@react-three/fiber";
+import { useRef, useMemo, useState, useEffect } from "react";
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { Float, MeshDistortMaterial, Sphere, Box, Torus, Icosahedron, Stars } from "@react-three/drei";
 import * as THREE from "three";
+
+// Mouse position hook
+const useMousePosition = () => {
+  const [mouse, setMouse] = useState({ x: 0, y: 0 });
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      setMouse({
+        x: (e.clientX / window.innerWidth) * 2 - 1,
+        y: -(e.clientY / window.innerHeight) * 2 + 1,
+      });
+    };
+
+    window.addEventListener("mousemove", handleMouseMove);
+    return () => window.removeEventListener("mousemove", handleMouseMove);
+  }, []);
+
+  return mouse;
+};
 
 const FloatingShape = ({ 
   position, 
@@ -9,7 +28,8 @@ const FloatingShape = ({
   speed = 1, 
   rotationSpeed = 0.01,
   scale = 1,
-  shape = "sphere"
+  shape = "sphere",
+  mouse
 }: { 
   position: [number, number, number]; 
   color: string; 
@@ -17,14 +37,21 @@ const FloatingShape = ({
   rotationSpeed?: number;
   scale?: number;
   shape?: "sphere" | "box" | "torus" | "icosahedron";
+  mouse: { x: number; y: number };
 }) => {
   const meshRef = useRef<THREE.Mesh>(null);
+  const originalPos = useRef(position);
 
   useFrame((state) => {
     if (meshRef.current) {
       meshRef.current.rotation.x += rotationSpeed;
       meshRef.current.rotation.y += rotationSpeed * 1.5;
-      meshRef.current.position.y = position[1] + Math.sin(state.clock.elapsedTime * speed) * 0.3;
+      
+      // Add mouse influence to position
+      const mouseInfluence = 0.5;
+      meshRef.current.position.x = originalPos.current[0] + mouse.x * mouseInfluence;
+      meshRef.current.position.y = originalPos.current[1] + Math.sin(state.clock.elapsedTime * speed) * 0.3 + mouse.y * mouseInfluence;
+      meshRef.current.position.z = originalPos.current[2];
     }
   });
 
@@ -48,7 +75,7 @@ const FloatingShape = ({
   );
 };
 
-const ParticleField = () => {
+const ParticleField = ({ mouse }: { mouse: { x: number; y: number } }) => {
   const particlesRef = useRef<THREE.Points>(null);
   
   const particleCount = 500;
@@ -64,8 +91,8 @@ const ParticleField = () => {
 
   useFrame((state) => {
     if (particlesRef.current) {
-      particlesRef.current.rotation.y = state.clock.elapsedTime * 0.02;
-      particlesRef.current.rotation.x = state.clock.elapsedTime * 0.01;
+      particlesRef.current.rotation.y = state.clock.elapsedTime * 0.02 + mouse.x * 0.1;
+      particlesRef.current.rotation.x = state.clock.elapsedTime * 0.01 + mouse.y * 0.1;
     }
   });
 
@@ -84,7 +111,7 @@ const ParticleField = () => {
   );
 };
 
-const NeuralNetwork = () => {
+const NeuralNetwork = ({ mouse }: { mouse: { x: number; y: number } }) => {
   const groupRef = useRef<THREE.Group>(null);
   
   const nodes = useMemo(() => {
@@ -118,8 +145,8 @@ const NeuralNetwork = () => {
 
   useFrame((state) => {
     if (groupRef.current) {
-      groupRef.current.rotation.y = state.clock.elapsedTime * 0.1;
-      groupRef.current.rotation.x = Math.sin(state.clock.elapsedTime * 0.2) * 0.2;
+      groupRef.current.rotation.y = state.clock.elapsedTime * 0.1 + mouse.x * 0.3;
+      groupRef.current.rotation.x = Math.sin(state.clock.elapsedTime * 0.2) * 0.2 + mouse.y * 0.2;
     }
   });
 
@@ -151,9 +178,10 @@ const ConnectionLine = ({ start, end }: { start: [number, number, number]; end: 
   );
 };
 
-const CentralOrb = () => {
+const CentralOrb = ({ mouse }: { mouse: { x: number; y: number } }) => {
   const meshRef = useRef<THREE.Mesh>(null);
   const glowRef = useRef<THREE.Mesh>(null);
+  const groupRef = useRef<THREE.Group>(null);
 
   useFrame((state) => {
     if (meshRef.current) {
@@ -163,10 +191,15 @@ const CentralOrb = () => {
     if (glowRef.current) {
       glowRef.current.scale.setScalar(1.5 + Math.sin(state.clock.elapsedTime * 2) * 0.1);
     }
+    if (groupRef.current) {
+      // Smooth mouse following for the central orb
+      groupRef.current.rotation.y = THREE.MathUtils.lerp(groupRef.current.rotation.y, mouse.x * 0.3, 0.05);
+      groupRef.current.rotation.x = THREE.MathUtils.lerp(groupRef.current.rotation.x, -mouse.y * 0.2, 0.05);
+    }
   });
 
   return (
-    <group position={[0, 0, 0]}>
+    <group ref={groupRef} position={[0, 0, 0]}>
       {/* Glow effect */}
       <mesh ref={glowRef}>
         <sphereGeometry args={[1.8, 32, 32]} />
@@ -200,27 +233,38 @@ const CentralOrb = () => {
   );
 };
 
+// Inner scene component that uses mouse position
+const SceneContent = ({ mouse }: { mouse: { x: number; y: number } }) => {
+  return (
+    <>
+      <ambientLight intensity={0.3} />
+      <pointLight position={[10, 10, 10]} intensity={1} color="#22d3ee" />
+      <pointLight position={[-10, -10, -10]} intensity={0.5} color="#a855f7" />
+      
+      <Stars radius={50} depth={50} count={1000} factor={4} saturation={0} fade speed={1} />
+      
+      <CentralOrb mouse={mouse} />
+      <NeuralNetwork mouse={mouse} />
+      <ParticleField mouse={mouse} />
+      
+      {/* Floating shapes around */}
+      <FloatingShape position={[-4, 2, -3]} color="#22d3ee" speed={1.2} scale={0.6} shape="icosahedron" mouse={mouse} />
+      <FloatingShape position={[4, -1, -2]} color="#a855f7" speed={0.8} scale={0.5} shape="box" mouse={mouse} />
+      <FloatingShape position={[-3, -2, 1]} color="#22d3ee" speed={1.5} scale={0.4} shape="torus" mouse={mouse} />
+      <FloatingShape position={[3, 2, 2]} color="#a855f7" speed={1} scale={0.5} shape="sphere" mouse={mouse} />
+      <FloatingShape position={[0, 3, -4]} color="#22d3ee" speed={0.7} scale={0.3} shape="icosahedron" mouse={mouse} />
+      <FloatingShape position={[-5, 0, 0]} color="#a855f7" speed={1.3} scale={0.4} shape="box" mouse={mouse} />
+    </>
+  );
+};
+
 export const Scene3D = () => {
+  const mouse = useMousePosition();
+
   return (
     <div className="absolute inset-0 z-0">
       <Canvas camera={{ position: [0, 0, 10], fov: 60 }}>
-        <ambientLight intensity={0.3} />
-        <pointLight position={[10, 10, 10]} intensity={1} color="#22d3ee" />
-        <pointLight position={[-10, -10, -10]} intensity={0.5} color="#a855f7" />
-        
-        <Stars radius={50} depth={50} count={1000} factor={4} saturation={0} fade speed={1} />
-        
-        <CentralOrb />
-        <NeuralNetwork />
-        <ParticleField />
-        
-        {/* Floating shapes around */}
-        <FloatingShape position={[-4, 2, -3]} color="#22d3ee" speed={1.2} scale={0.6} shape="icosahedron" />
-        <FloatingShape position={[4, -1, -2]} color="#a855f7" speed={0.8} scale={0.5} shape="box" />
-        <FloatingShape position={[-3, -2, 1]} color="#22d3ee" speed={1.5} scale={0.4} shape="torus" />
-        <FloatingShape position={[3, 2, 2]} color="#a855f7" speed={1} scale={0.5} shape="sphere" />
-        <FloatingShape position={[0, 3, -4]} color="#22d3ee" speed={0.7} scale={0.3} shape="icosahedron" />
-        <FloatingShape position={[-5, 0, 0]} color="#a855f7" speed={1.3} scale={0.4} shape="box" />
+        <SceneContent mouse={mouse} />
       </Canvas>
     </div>
   );
