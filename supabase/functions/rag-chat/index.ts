@@ -115,12 +115,13 @@ ${context ? `RETRIEVED CONTEXT:\n${context}` : "NO CONTEXT AVAILABLE - The docum
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
+        model: "google/gemini-2.5-flash-lite",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: message },
         ],
         stream: true,
+        max_tokens: 1024,
       }),
     });
 
