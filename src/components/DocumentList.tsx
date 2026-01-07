@@ -67,9 +67,16 @@ export function DocumentList({ refreshTrigger }: DocumentListProps) {
   const handleDelete = async (id: string) => {
     setDeletingId(id);
     try {
-      const { error } = await supabase.from("documents").delete().eq("id", id);
-      if (error) throw error;
-      
+      // Delete chunks first to avoid FK constraint errors if cascade isn't configured
+      const { error: chunksError } = await supabase
+        .from("document_chunks")
+        .delete()
+        .eq("document_id", id);
+      if (chunksError) throw chunksError;
+
+      const { error: docError } = await supabase.from("documents").delete().eq("id", id);
+      if (docError) throw docError;
+
       setDocuments((prev) => prev.filter((d) => d.id !== id));
       toast({
         title: "Document deleted",
