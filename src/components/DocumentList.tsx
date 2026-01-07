@@ -160,7 +160,7 @@ export function DocumentList({ refreshTrigger }: DocumentListProps) {
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="w-6 h-6 opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive"
+                  className="w-6 h-6 text-muted-foreground hover:text-destructive"
                   onClick={() => handleDelete(doc.id)}
                   disabled={deletingId === doc.id}
                 >
