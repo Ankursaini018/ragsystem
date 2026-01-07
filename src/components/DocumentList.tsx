@@ -68,21 +68,35 @@ export function DocumentList({ refreshTrigger }: DocumentListProps) {
     setDeletingId(id);
     try {
       // Delete chunks first to avoid FK constraint errors if cascade isn't configured
-      const { error: chunksError } = await supabase
+      const { data: deletedChunks, error: chunksError } = await supabase
         .from("document_chunks")
         .delete()
-        .eq("document_id", id);
+        .eq("document_id", id)
+        .select("id");
       if (chunksError) throw chunksError;
 
-      const { error: docError } = await supabase.from("documents").delete().eq("id", id);
+      const { data: deletedDocs, error: docError } = await supabase
+        .from("documents")
+        .delete()
+        .eq("id", id)
+        .select("id");
       if (docError) throw docError;
 
-      setDocuments((prev) => prev.filter((d) => d.id !== id));
+      if (!deletedDocs || deletedDocs.length === 0) {
+        throw new Error(
+          "Delete did not remove the document (not found or no permission)."
+        );
+      }
+
+      // Refresh from server to reflect the real state
+      await fetchDocuments();
+
       toast({
         title: "Document deleted",
-        description: "Document and its chunks have been removed.",
+        description: `Removed document and ${deletedChunks?.length ?? 0} chunk(s).`,
       });
     } catch (error) {
+      console.error("Delete failed:", error);
       toast({
         title: "Delete failed",
         description: error instanceof Error ? error.message : "Unknown error",
@@ -144,37 +158,41 @@ export function DocumentList({ refreshTrigger }: DocumentListProps) {
         </Button>
       </div>
       <ScrollArea className="h-[300px]">
-        <div className="space-y-2 pr-2">
+        <div className="space-y-2 pr-4">
           {documents.map((doc) => (
             <div
               key={doc.id}
               className={cn(
-                "doc-card p-3 rounded-lg bg-muted/30 border border-border/50 group"
+                "doc-card w-full p-3 rounded-lg bg-muted/30 border border-border/50"
               )}
             >
-              <div className="flex items-start gap-2">
-                <span className="text-primary mt-0.5">
-                  {getSourceIcon(doc.source_type)}
-                </span>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate" title={doc.title}>
-                    {doc.title}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {doc.chunk_count} chunks • {formatDate(doc.created_at)}
-                  </p>
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-start gap-2 min-w-0 flex-1">
+                  <span className="text-primary mt-0.5 shrink-0">
+                    {getSourceIcon(doc.source_type)}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium truncate" title={doc.title}>
+                      {doc.title}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {doc.chunk_count} chunks • {formatDate(doc.created_at)}
+                    </p>
+                  </div>
                 </div>
+
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="w-6 h-6 text-muted-foreground hover:text-destructive"
+                  className="w-8 h-8 shrink-0 text-muted-foreground hover:text-destructive"
                   onClick={() => handleDelete(doc.id)}
                   disabled={deletingId === doc.id}
+                  aria-label={`Delete ${doc.title}`}
                 >
                   {deletingId === doc.id ? (
-                    <RefreshCw className="w-3 h-3 animate-spin" />
+                    <RefreshCw className="w-4 h-4 animate-spin" />
                   ) : (
-                    <Trash2 className="w-3 h-3" />
+                    <Trash2 className="w-4 h-4" />
                   )}
                 </Button>
               </div>
