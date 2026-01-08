@@ -66,8 +66,10 @@ export function DocumentList({ refreshTrigger }: DocumentListProps) {
 
   const handleDelete = async (id: string) => {
     setDeletingId(id);
+    console.log("[DocumentList] delete start", { id });
+
     try {
-      // Delete chunks first to avoid FK constraint errors if cascade isn't configured
+      // Delete chunks first to avoid FK constraint errors
       const { data: deletedChunks, error: chunksError } = await supabase
         .from("document_chunks")
         .delete()
@@ -82,19 +84,29 @@ export function DocumentList({ refreshTrigger }: DocumentListProps) {
         .select("id");
       if (docError) throw docError;
 
-      // If nothing was deleted, don't pretend success (common when permissions are missing).
-      if (!deletedDocs || deletedDocs.length === 0) {
-        await fetchDocuments();
+      // Some backends may respond with 204/no body even if the delete succeeded.
+      // If we didn't get rows back, verify by checking if the document still exists.
+      let docDeleted = (deletedDocs?.length ?? 0) > 0;
+      if (!docDeleted) {
+        const { data: stillThere, error: checkError } = await supabase
+          .from("documents")
+          .select("id")
+          .eq("id", id)
+          .maybeSingle();
+        if (checkError) throw checkError;
+        docDeleted = !stillThere;
+      }
+
+      if (!docDeleted) {
         toast({
           title: "Delete failed",
           description:
-            "No rows were deleted. You may not have permission to delete this document.",
+            "The document could not be removed. Please log in and try again.",
           variant: "destructive",
         });
         return;
       }
 
-      // Refresh from server to reflect the real state
       await fetchDocuments();
 
       toast({
@@ -107,7 +119,7 @@ export function DocumentList({ refreshTrigger }: DocumentListProps) {
           ? JSON.stringify(error, Object.getOwnPropertyNames(error))
           : String(error);
 
-      console.error("Delete failed:", error);
+      console.error("[DocumentList] delete failed", error);
       toast({
         title: "Delete failed",
         description: details,
