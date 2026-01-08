@@ -82,10 +82,16 @@ export function DocumentList({ refreshTrigger }: DocumentListProps) {
         .select("id");
       if (docError) throw docError;
 
+      // If nothing was deleted, don't pretend success (common when permissions are missing).
       if (!deletedDocs || deletedDocs.length === 0) {
-        throw new Error(
-          "Delete did not remove the document (not found or no permission)."
-        );
+        await fetchDocuments();
+        toast({
+          title: "Delete failed",
+          description:
+            "No rows were deleted. You may not have permission to delete this document.",
+          variant: "destructive",
+        });
+        return;
       }
 
       // Refresh from server to reflect the real state
@@ -96,10 +102,15 @@ export function DocumentList({ refreshTrigger }: DocumentListProps) {
         description: `Removed document and ${deletedChunks?.length ?? 0} chunk(s).`,
       });
     } catch (error) {
+      const details =
+        error && typeof error === "object"
+          ? JSON.stringify(error, Object.getOwnPropertyNames(error))
+          : String(error);
+
       console.error("Delete failed:", error);
       toast({
         title: "Delete failed",
-        description: error instanceof Error ? error.message : "Unknown error",
+        description: details,
         variant: "destructive",
       });
     } finally {
@@ -157,8 +168,8 @@ export function DocumentList({ refreshTrigger }: DocumentListProps) {
           <RefreshCw className="w-3 h-3" />
         </Button>
       </div>
-      <ScrollArea className="h-[300px]">
-        <div className="space-y-2 pr-4">
+      <ScrollArea className="h-[300px] w-full">
+        <div className="space-y-2 pr-8">
           {documents.map((doc) => (
             <div
               key={doc.id}
