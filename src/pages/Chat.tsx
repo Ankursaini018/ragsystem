@@ -92,7 +92,7 @@ const Chat = () => {
       <aside
         className={cn(
           "fixed lg:relative z-20 h-full min-w-0 overflow-hidden bg-sidebar border-r border-sidebar-border transition-all duration-300 will-change-transform",
-          sidebarOpen ? "w-80 translate-x-0" : "w-0 -translate-x-[20rem]"
+          sidebarOpen ? "w-[26rem] translate-x-0" : "w-0 -translate-x-[26rem]"
         )}
       >
         <div className="flex flex-col h-full w-full overflow-hidden">
