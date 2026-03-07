@@ -96,6 +96,32 @@ export function DocumentUpload({ onUploadComplete }: DocumentUploadProps) {
     }
   };
 
+  const extractPdfText = async (file: File): Promise<string> => {
+    const pdfjsLib = await import("pdfjs-dist");
+    pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
+
+    const arrayBuffer = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+    const textParts: string[] = [];
+
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page = await pdf.getPage(i);
+      const content = await page.getTextContent();
+      const pageText = content.items
+        .map((item: any) => item.str)
+        .join(" ");
+      if (pageText.trim()) {
+        textParts.push(pageText);
+      }
+    }
+
+    const fullText = textParts.join("\n\n");
+    if (fullText.trim().length < 20) {
+      throw new Error("Could not extract readable text from PDF. It may be a scanned/image-based document.");
+    }
+    return fullText;
+  };
+
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -114,31 +140,24 @@ export function DocumentUpload({ onUploadComplete }: DocumentUploadProps) {
 
     setIsUploading(true);
     try {
+      let content: string;
+
       if (isPdf) {
-        // For PDF, read as base64 and send to backend for parsing
-        const arrayBuffer = await file.arrayBuffer();
-        const base64 = btoa(
-          new Uint8Array(arrayBuffer).reduce((data, byte) => data + String.fromCharCode(byte), '')
-        );
-        
-        const result = await ingestDocument(file.name, base64, "pdf");
-        setUploadResult({ title: file.name, chunks: result.chunksCreated });
-        toast({
-          title: "PDF uploaded",
-          description: `Created ${result.chunksCreated} chunks from "${file.name}"`,
-        });
+        content = await extractPdfText(file);
       } else {
-        const content = await file.text();
+        content = await file.text();
         if (!content.trim()) {
           throw new Error("No text content found in file");
         }
-        const result = await ingestDocument(file.name, content, "text");
-        setUploadResult({ title: file.name, chunks: result.chunksCreated });
-        toast({
-          title: "File uploaded",
-          description: `Created ${result.chunksCreated} chunks from "${file.name}"`,
-        });
       }
+
+      // Always send as "text" since we extracted text client-side
+      const result = await ingestDocument(file.name, content, isPdf ? "pdf" : "text");
+      setUploadResult({ title: file.name, chunks: result.chunksCreated });
+      toast({
+        title: isPdf ? "PDF uploaded" : "File uploaded",
+        description: `Created ${result.chunksCreated} chunks from "${file.name}"`,
+      });
       onUploadComplete();
     } catch (error) {
       toast({
