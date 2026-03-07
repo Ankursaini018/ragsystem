@@ -109,7 +109,7 @@ export function RAGChat() {
         setIsLoading(false);
       }
     },
-    [sessionId]
+    [sessionId, selectedDocumentId]
   );
 
   return (
