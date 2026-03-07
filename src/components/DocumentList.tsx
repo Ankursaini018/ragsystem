@@ -12,6 +12,7 @@ interface Document {
   source_type: string;
   source_url: string | null;
   created_at: string;
+  summary: string | null;
   chunk_count?: number;
 }
 
