@@ -9,7 +9,6 @@ interface ChatMessageProps {
   citations?: Citation[];
   confidenceScore?: number;
   latencyMs?: number;
-  isStreaming?: boolean;
 }
 
 export function ChatMessage({
@@ -18,7 +17,6 @@ export function ChatMessage({
   citations,
   confidenceScore,
   latencyMs,
-  isStreaming,
 }: ChatMessageProps) {
   const [showSources, setShowSources] = useState(false);
   const isUser = role === "user";
@@ -58,7 +56,6 @@ export function ChatMessage({
         >
           <p className="whitespace-pre-wrap leading-relaxed">
             {content}
-            {isStreaming && <span className="cursor-blink" />}
           </p>
         </div>
 

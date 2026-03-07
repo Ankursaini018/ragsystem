@@ -13,31 +13,23 @@ export interface Citation {
   };
 }
 
-export interface ChatMetadata {
+export interface ChatResponse {
+  content: string;
   citations: Citation[];
   confidenceScore: number;
-  latencyMs: number;
   chunksRetrieved: number;
-}
-
-export interface StreamCallbacks {
-  onMetadata: (metadata: ChatMetadata) => void;
-  onDelta: (text: string) => void;
-  onDone: () => void;
-  onError: (error: string) => void;
 }
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/rag-chat`;
 
-export async function streamChat(
+export async function sendChat(
   message: string,
-  sessionId: string,
-  callbacks: StreamCallbacks
-): Promise<void> {
-  try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30000);
+  sessionId: string
+): Promise<ChatResponse> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 30000);
 
+  try {
     const response = await fetch(CHAT_URL, {
       method: "POST",
       headers: {
@@ -53,76 +45,21 @@ export async function streamChat(
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
       if (response.status === 429) {
-        callbacks.onError("Rate limit exceeded. Please wait a moment and try again.");
-        return;
+        throw new Error("Rate limit exceeded. Please wait a moment and try again.");
       }
       if (response.status === 402) {
-        callbacks.onError("Usage credits exhausted. Please add credits to continue.");
-        return;
+        throw new Error("Usage credits exhausted. Please add credits to continue.");
       }
       throw new Error(errorData.error || `Request failed: ${response.status}`);
     }
 
-    if (!response.body) {
-      throw new Error("No response body");
-    }
-
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = "";
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-
-      buffer += decoder.decode(value, { stream: true });
-
-      // Process complete SSE lines
-      let newlineIndex: number;
-      while ((newlineIndex = buffer.indexOf("\n")) !== -1) {
-        let line = buffer.slice(0, newlineIndex);
-        buffer = buffer.slice(newlineIndex + 1);
-
-        if (line.endsWith("\r")) line = line.slice(0, -1);
-        if (line.startsWith(":") || line.trim() === "") continue;
-        if (!line.startsWith("data: ")) continue;
-
-        const jsonStr = line.slice(6).trim();
-        if (jsonStr === "[DONE]") {
-          callbacks.onDone();
-          return;
-        }
-
-        try {
-          const parsed = JSON.parse(jsonStr);
-          
-          // Handle metadata event
-          if (parsed.type === "metadata") {
-            callbacks.onMetadata({
-              citations: parsed.citations,
-              confidenceScore: parsed.confidenceScore,
-              latencyMs: parsed.latencyMs,
-              chunksRetrieved: parsed.chunksRetrieved,
-            });
-            continue;
-          }
-
-          // Handle content delta
-          const content = parsed.choices?.[0]?.delta?.content;
-          if (content) {
-            callbacks.onDelta(content);
-          }
-        } catch {
-          // Incomplete JSON, put back and wait
-          buffer = line + "\n" + buffer;
-          break;
-        }
-      }
-    }
-
-    callbacks.onDone();
+    return await response.json();
   } catch (error) {
-    callbacks.onError(error instanceof Error ? error.message : "Unknown error");
+    clearTimeout(timeoutId);
+    if (error instanceof DOMException && error.name === "AbortError") {
+      throw new Error("Request timed out. Please try again.");
+    }
+    throw error;
   }
 }
 
