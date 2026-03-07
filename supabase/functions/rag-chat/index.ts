@@ -12,8 +12,8 @@ serve(async (req) => {
   }
 
   try {
-    const { message, sessionId } = await req.json();
-    console.log("RAG chat request:", message?.substring(0, 50));
+    const { message, sessionId, documentId } = await req.json();
+    console.log("RAG chat request:", message?.substring(0, 50), "docId:", documentId);
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
