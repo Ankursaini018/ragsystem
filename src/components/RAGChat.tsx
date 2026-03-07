@@ -161,7 +161,23 @@ export function RAGChat() {
       </ScrollArea>
 
       <div className="p-4 border-t border-border/50">
-        <div className="max-w-3xl mx-auto">
+        <div className="max-w-3xl mx-auto space-y-2">
+          <div className="flex items-center gap-2">
+            <FileText className="w-4 h-4 text-muted-foreground" />
+            <Select value={selectedDocumentId} onValueChange={setSelectedDocumentId}>
+              <SelectTrigger className="w-[220px] h-8 text-xs bg-secondary border-border/50">
+                <SelectValue placeholder="All documents" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All documents</SelectItem>
+                {documents.map((doc) => (
+                  <SelectItem key={doc.id} value={doc.id}>
+                    {doc.title}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
           <ChatInput onSend={handleSend} isLoading={isLoading} />
         </div>
       </div>
