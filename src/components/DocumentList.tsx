@@ -32,7 +32,7 @@ export function DocumentList({ refreshTrigger }: DocumentListProps) {
       // Fetch documents with chunk counts
       const { data: docs, error: docsError } = await supabase
         .from("documents")
-        .select("id, title, source_type, source_url, created_at")
+        .select("id, title, source_type, source_url, created_at, summary")
         .order("created_at", { ascending: false });
 
       if (docsError) throw docsError;
