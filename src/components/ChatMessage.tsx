@@ -17,7 +17,6 @@ export function ChatMessage({
   citations,
   confidenceScore,
   latencyMs,
-  isStreaming,
 }: ChatMessageProps) {
   const [showSources, setShowSources] = useState(false);
   const isUser = role === "user";
