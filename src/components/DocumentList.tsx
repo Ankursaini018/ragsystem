@@ -199,7 +199,12 @@ export function DocumentList({ refreshTrigger }: DocumentListProps) {
                     <p className="text-sm font-medium truncate" title={doc.title}>
                       {doc.title}
                     </p>
-                    <p className="text-xs text-muted-foreground">
+                    {doc.summary && (
+                      <p className="text-xs text-muted-foreground/80 mt-0.5 line-clamp-2">
+                        {doc.summary}
+                      </p>
+                    )}
+                    <p className="text-xs text-muted-foreground mt-0.5">
                       {doc.chunk_count} chunks • {formatDate(doc.created_at)}
                     </p>
                   </div>
