@@ -56,7 +56,6 @@ export function ChatMessage({
         >
           <p className="whitespace-pre-wrap leading-relaxed">
             {content}
-            {isStreaming && <span className="cursor-blink" />}
           </p>
         </div>
 
