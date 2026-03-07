@@ -98,17 +98,19 @@ export function ChatMessage({
           <div className="w-full space-y-2 animate-fade-in">
             {citations.map((citation, idx) => (
               <div key={citation.chunkId} className="source-card">
-                <div className="flex items-start justify-between gap-2 mb-1">
+                <div className="flex items-start justify-between gap-2 mb-2">
                   <span className="text-xs font-medium text-primary">
                     Source {idx + 1}: {citation.metadata.title || "Unknown"}
                   </span>
-                  <span className="text-xs text-muted-foreground">
+                  <span className="text-xs text-muted-foreground whitespace-nowrap">
                     {Math.round(citation.similarity * 100)}% match
                   </span>
                 </div>
-                <p className="text-xs text-muted-foreground line-clamp-3">
-                  {citation.content}
-                </p>
+                <div className="rounded-md bg-muted/50 p-3 border border-border/30">
+                  <p className="text-xs text-foreground/80 whitespace-pre-wrap leading-relaxed">
+                    {citation.content}
+                  </p>
+                </div>
                 {citation.metadata.sourceUrl && (
                   <a
                     href={citation.metadata.sourceUrl}

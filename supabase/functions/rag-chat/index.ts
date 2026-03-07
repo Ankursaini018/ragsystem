@@ -81,7 +81,7 @@ serve(async (req) => {
         citations.push({
           chunkId: chunk.id,
           documentId: chunk.document_id,
-          content: chunk.content.substring(0, 200) + (chunk.content.length > 200 ? "..." : ""),
+          content: chunk.content.substring(0, 800) + (chunk.content.length > 800 ? "..." : ""),
           similarity: 0.7,
           metadata: {
             title: doc?.title,
