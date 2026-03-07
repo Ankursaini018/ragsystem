@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Database, MessageSquare, FileText, Search, Sparkles, ArrowRight, Upload, Brain, CheckCircle, LogIn } from "lucide-react";
+import { Database, MessageSquare, FileText, Search, Sparkles, ArrowRight, Upload, Brain, CheckCircle } from "lucide-react";
 import { Scene3D } from "@/components/Scene3D";
 import { ScrollReveal, StaggerContainer, StaggerItem } from "@/components/ScrollReveal";
 
@@ -20,12 +20,6 @@ const Landing = () => {
             <a href="#home" className="text-sm text-muted-foreground hover:text-foreground transition-colors hidden sm:block">Home</a>
             <a href="#about" className="text-sm text-muted-foreground hover:text-foreground transition-colors hidden sm:block">About</a>
             <a href="#how-it-works" className="text-sm text-muted-foreground hover:text-foreground transition-colors hidden sm:block">How it Works</a>
-            <Link to="/auth">
-              <Button variant="ghost" size="sm" className="gap-2">
-                <LogIn className="w-4 h-4" />
-                Login
-              </Button>
-            </Link>
             <Link to="/chat">
               <Button size="sm" className="gap-2">
                 <MessageSquare className="w-4 h-4" />
