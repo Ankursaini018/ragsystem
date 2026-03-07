@@ -12,8 +12,8 @@ serve(async (req) => {
   }
 
   try {
-    const { message, sessionId } = await req.json();
-    console.log("RAG chat request:", message?.substring(0, 50));
+    const { message, sessionId, documentId } = await req.json();
+    console.log("RAG chat request:", message?.substring(0, 50), "docId:", documentId);
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
@@ -34,11 +34,12 @@ serve(async (req) => {
 
     if (keywords.length > 0) {
       const orFilter = keywords.map((k: string) => `content.ilike.%${k}%`).join(',');
-      const { data, error } = await supabase
+      let query = supabase
         .from("document_chunks")
         .select("id, document_id, content, chunk_index, metadata")
-        .or(orFilter)
-        .limit(3);
+        .or(orFilter);
+      if (documentId) query = query.eq("document_id", documentId);
+      const { data, error } = await query.limit(3);
 
       if (error) {
         console.error("Search error:", error);
@@ -49,11 +50,11 @@ serve(async (req) => {
 
     // Fallback: grab first 3 chunks
     if (chunks.length === 0) {
-      const { data } = await supabase
+      let fallbackQuery = supabase
         .from("document_chunks")
-        .select("id, document_id, content, chunk_index, metadata")
-        .order("chunk_index", { ascending: true })
-        .limit(3);
+        .select("id, document_id, content, chunk_index, metadata");
+      if (documentId) fallbackQuery = fallbackQuery.eq("document_id", documentId);
+      const { data } = await fallbackQuery.order("chunk_index", { ascending: true }).limit(3);
       chunks = data || [];
     }
 
