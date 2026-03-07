@@ -14,21 +14,24 @@ serve(async (req) => {
   try {
     const { message, sessionId } = await req.json();
     console.log("RAG chat request:", message?.substring(0, 50));
-    
+
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
     if (!LOVABLE_API_KEY) {
-      throw new Error("LOVABLE_API_KEY is not configured");
+      return new Response(
+        JSON.stringify({ error: "LOVABLE_API_KEY is not configured" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!);
 
-    // Step 1: Quick search - use simple ILIKE for speed instead of full-text search
+    // Step 1: Retrieve top 3 chunks via ILIKE keyword search
     const keywords = message.split(/\s+/).filter((w: string) => w.length > 3).slice(0, 5);
     let chunks: any[] = [];
-    
+
     if (keywords.length > 0) {
       const orFilter = keywords.map((k: string) => `content.ilike.%${k}%`).join(',');
       const { data, error } = await supabase
@@ -36,7 +39,7 @@ serve(async (req) => {
         .select("id, document_id, content, chunk_index, metadata")
         .or(orFilter)
         .limit(3);
-      
+
       if (error) {
         console.error("Search error:", error);
       } else {
@@ -44,7 +47,7 @@ serve(async (req) => {
       }
     }
 
-    // If no keyword matches, grab first few chunks as fallback context
+    // Fallback: grab first 3 chunks
     if (chunks.length === 0) {
       const { data } = await supabase
         .from("document_chunks")
@@ -56,7 +59,7 @@ serve(async (req) => {
 
     console.log("Found chunks:", chunks.length);
 
-    // Step 2: Build context
+    // Step 2: Build context and citations
     let context = "";
     const citations: any[] = [];
 
@@ -71,7 +74,6 @@ serve(async (req) => {
 
       chunks.forEach((chunk, idx) => {
         const doc = docMap.get(chunk.document_id) as any;
-        // Truncate chunk content to 500 chars for faster LLM processing
         const truncated = chunk.content.substring(0, 500);
         context += `[Source ${idx + 1}: ${doc?.title || "Unknown"}]\n${truncated}\n\n`;
 
@@ -89,16 +91,17 @@ serve(async (req) => {
       });
     }
 
-    // Step 3: Generate response with fast model and timeout
+    // Step 3: Non-streaming LLM call with timeout
     const systemPrompt = `You are a helpful RAG assistant. Answer based on context provided.
 Use [Source N] citations. Be concise and direct.
 ${context ? `\nCONTEXT:\n${context}` : "\nNO CONTEXT AVAILABLE. Say you couldn't find relevant information."}`;
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 25000); // 25s timeout
+    const timeoutId = setTimeout(() => controller.abort(), 20000);
 
+    let llmResponse;
     try {
-      const llmResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      llmResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
         method: "POST",
         headers: {
           Authorization: `Bearer ${LOVABLE_API_KEY}`,
@@ -110,68 +113,15 @@ ${context ? `\nCONTEXT:\n${context}` : "\nNO CONTEXT AVAILABLE. Say you couldn't
             { role: "system", content: systemPrompt },
             { role: "user", content: message },
           ],
-          stream: true,
-          max_tokens: 300,
+          stream: false,
+          max_tokens: 200,
         }),
         signal: controller.signal,
       });
-
-      clearTimeout(timeoutId);
-
-      if (!llmResponse.ok) {
-        if (llmResponse.status === 429) {
-          return new Response(
-            JSON.stringify({ error: "Rate limit exceeded. Please try again later." }),
-            { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-          );
-        }
-        if (llmResponse.status === 402) {
-          return new Response(
-            JSON.stringify({ error: "Payment required. Please add credits." }),
-            { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-          );
-        }
-        const errorText = await llmResponse.text();
-        console.error("LLM error:", llmResponse.status, errorText);
-        throw new Error(`LLM API error: ${llmResponse.status}`);
-      }
-
-      // Stream response with metadata prepended
-      const encoder = new TextEncoder();
-      const metadataEvent = `data: ${JSON.stringify({
-        type: "metadata",
-        citations,
-        confidenceScore: citations.length > 0 ? 0.7 : 0.1,
-        latencyMs: 0,
-        chunksRetrieved: citations.length,
-      })}\n\n`;
-
-      const { readable, writable } = new TransformStream();
-      const writer = writable.getWriter();
-
-      await writer.write(encoder.encode(metadataEvent));
-
-      const reader = llmResponse.body!.getReader();
-
-      (async () => {
-        try {
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            await writer.write(value);
-          }
-        } finally {
-          await writer.close();
-        }
-      })();
-
-      return new Response(readable, {
-        headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
-      });
-
     } catch (fetchError) {
       clearTimeout(timeoutId);
       if (fetchError instanceof DOMException && fetchError.name === 'AbortError') {
+        console.error("LLM call timed out");
         return new Response(
           JSON.stringify({ error: "Request timed out. Please try a shorter question." }),
           { status: 504, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -179,6 +129,44 @@ ${context ? `\nCONTEXT:\n${context}` : "\nNO CONTEXT AVAILABLE. Say you couldn't
       }
       throw fetchError;
     }
+
+    clearTimeout(timeoutId);
+
+    if (!llmResponse.ok) {
+      const errorText = await llmResponse.text();
+      console.error("LLM error:", llmResponse.status, errorText);
+      if (llmResponse.status === 429) {
+        return new Response(
+          JSON.stringify({ error: "Rate limit exceeded. Please try again later." }),
+          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      if (llmResponse.status === 402) {
+        return new Response(
+          JSON.stringify({ error: "Payment required. Please add credits." }),
+          { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      return new Response(
+        JSON.stringify({ error: `LLM API error: ${llmResponse.status}` }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const llmData = await llmResponse.json();
+    const content = llmData.choices?.[0]?.message?.content || "No response generated.";
+
+    console.log("LLM response received, length:", content.length);
+
+    return new Response(
+      JSON.stringify({
+        content,
+        citations,
+        confidenceScore: citations.length > 0 ? 0.7 : 0.1,
+        chunksRetrieved: citations.length,
+      }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
 
   } catch (error) {
     console.error("RAG chat error:", error);

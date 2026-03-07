@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { ChatMessage } from "./ChatMessage";
 import { ChatInput } from "./ChatInput";
-import { streamChat, Citation, ChatMetadata } from "@/lib/rag-api";
+import { sendChat, Citation } from "@/lib/rag-api";
 import { supabase } from "@/integrations/supabase/client";
 import { Sparkles } from "lucide-react";
 
@@ -13,17 +13,14 @@ interface Message {
   citations?: Citation[];
   confidenceScore?: number;
   latencyMs?: number;
-  isStreaming?: boolean;
 }
 
 export function RAGChat() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
-  const scrollRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
-  // Create a new session on mount
   useEffect(() => {
     const createSession = async () => {
       const { data, error } = await supabase
@@ -31,15 +28,11 @@ export function RAGChat() {
         .insert({ title: "New Chat" })
         .select()
         .single();
-
-      if (!error && data) {
-        setSessionId(data.id);
-      }
+      if (!error && data) setSessionId(data.id);
     };
     createSession();
   }, []);
 
-  // Auto-scroll to bottom
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
@@ -57,101 +50,47 @@ export function RAGChat() {
       setMessages((prev) => [...prev, userMessage]);
       setIsLoading(true);
 
-      // Create placeholder for assistant message
-      const assistantId = crypto.randomUUID();
-      let assistantContent = "";
-      let metadata: ChatMetadata | null = null;
-
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: assistantId,
-          role: "assistant",
-          content: "",
-          isStreaming: true,
-        },
-      ]);
-
       try {
-        await streamChat(content, sessionId, {
-          onMetadata: (meta) => {
-            metadata = meta;
-            setMessages((prev) =>
-              prev.map((m) =>
-                m.id === assistantId
-                  ? {
-                      ...m,
-                      citations: meta.citations,
-                      confidenceScore: meta.confidenceScore,
-                      latencyMs: meta.latencyMs,
-                    }
-                  : m
-              )
-            );
-          },
-          onDelta: (delta) => {
-            assistantContent += delta;
-            setMessages((prev) =>
-              prev.map((m) =>
-                m.id === assistantId ? { ...m, content: assistantContent } : m
-              )
-            );
-          },
-          onDone: () => {
-            setMessages((prev) =>
-              prev.map((m) =>
-                m.id === assistantId ? { ...m, isStreaming: false } : m
-              )
-            );
-            setIsLoading(false);
+        const startTime = Date.now();
+        const response = await sendChat(content, sessionId);
+        const latencyMs = Date.now() - startTime;
 
-            // Save messages to database
-            if (metadata) {
-              supabase
-                .from("chat_messages")
-                .insert([
-                  { session_id: sessionId, role: "user", content },
-                  {
-                    session_id: sessionId,
-                    role: "assistant",
-                    content: assistantContent,
-                    citations: JSON.parse(JSON.stringify(metadata.citations)),
-                    confidence_score: metadata.confidenceScore,
-                    latency_ms: metadata.latencyMs,
-                  },
-                ])
-                .then(({ error }) => {
-                  if (error) console.error("Failed to save messages:", error);
-                });
-            }
-          },
-          onError: (error) => {
-            setMessages((prev) =>
-              prev.map((m) =>
-                m.id === assistantId
-                  ? {
-                      ...m,
-                      content: `Error: ${error}`,
-                      isStreaming: false,
-                    }
-                  : m
-              )
-            );
-            setIsLoading(false);
-          },
-        });
+        const assistantMessage: Message = {
+          id: crypto.randomUUID(),
+          role: "assistant",
+          content: response.content,
+          citations: response.citations,
+          confidenceScore: response.confidenceScore,
+          latencyMs,
+        };
+
+        setMessages((prev) => [...prev, assistantMessage]);
+
+        // Save to database
+        supabase
+          .from("chat_messages")
+          .insert([
+            { session_id: sessionId, role: "user", content },
+            {
+              session_id: sessionId,
+              role: "assistant",
+              content: response.content,
+              citations: JSON.parse(JSON.stringify(response.citations)),
+              confidence_score: response.confidenceScore,
+              latency_ms: latencyMs,
+            },
+          ])
+          .then(({ error }) => {
+            if (error) console.error("Failed to save messages:", error);
+          });
       } catch (error) {
-        setMessages((prev) =>
-          prev.map((m) =>
-            m.id === assistantId
-              ? {
-                  ...m,
-                  content: `Error: ${error instanceof Error ? error.message : "Unknown error"}`,
-                  isStreaming: false,
-                }
-              : m
-          )
-        );
+        const errorMessage: Message = {
+          id: crypto.randomUUID(),
+          role: "assistant",
+          content: `Error: ${error instanceof Error ? error.message : "Unknown error"}`,
+        };
+        setMessages((prev) => [...prev, errorMessage]);
+      } finally {
         setIsLoading(false);
       }
     },
@@ -160,8 +99,7 @@ export function RAGChat() {
 
   return (
     <div className="flex flex-col h-full">
-      {/* Messages area */}
-      <ScrollArea className="flex-1 px-4" ref={scrollRef}>
+      <ScrollArea className="flex-1 px-4">
         <div className="max-w-3xl mx-auto py-6 space-y-6">
           {messages.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-[50vh] text-center">
@@ -200,7 +138,6 @@ export function RAGChat() {
                 citations={message.citations}
                 confidenceScore={message.confidenceScore}
                 latencyMs={message.latencyMs}
-                isStreaming={message.isStreaming}
               />
             ))
           )}
@@ -208,7 +145,6 @@ export function RAGChat() {
         </div>
       </ScrollArea>
 
-      {/* Input area */}
       <div className="p-4 border-t border-border/50">
         <div className="max-w-3xl mx-auto">
           <ChatInput onSend={handleSend} isLoading={isLoading} />
