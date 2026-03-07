@@ -6,113 +6,91 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Simple text chunker with overlap
-function chunkText(text: string, chunkSize = 400, overlap = 50): string[] {
-  const words = text.split(/\s+/);
+function chunkText(text: string, chunkSize = 300, overlap = 50): string[] {
+  const words = text.split(/\s+/).filter(w => w.length > 0);
   const chunks: string[] = [];
   
   let i = 0;
   while (i < words.length) {
     const chunkWords = words.slice(i, i + chunkSize);
-    const chunk = chunkWords.join(' ');
-    if (chunk.trim().length > 0) {
-      chunks.push(chunk.trim());
+    const chunk = chunkWords.join(' ').trim();
+    if (chunk.length > 0) {
+      chunks.push(chunk);
     }
     i += chunkSize - overlap;
-    if (i + overlap >= words.length && i < words.length) break;
-  }
-  
-  // Add remaining words if any
-  if (i < words.length) {
-    const remaining = words.slice(i).join(' ').trim();
-    if (remaining.length > 0) {
-      chunks.push(remaining);
-    }
+    if (i >= words.length) break;
   }
   
   return chunks;
 }
 
-// Clean text by removing extra whitespace and special characters
 function cleanText(text: string): string {
   return text
     .replace(/\r\n/g, '\n')
     .replace(/\n{3,}/g, '\n\n')
     .replace(/\s{2,}/g, ' ')
     .replace(/[^\x20-\x7E\n]/g, ' ')
+    .replace(/\s{2,}/g, ' ')
     .trim();
 }
 
-// Estimate token count (rough approximation: ~4 chars per token)
 function estimateTokens(text: string): number {
   return Math.ceil(text.length / 4);
 }
 
-// Extract text from PDF using pdf-parse compatible approach
-async function extractPdfText(base64Data: string): Promise<string> {
+function extractPdfText(base64Data: string): string {
   try {
-    // Decode base64 to binary
     const binaryString = atob(base64Data);
     const bytes = new Uint8Array(binaryString.length);
     for (let i = 0; i < binaryString.length; i++) {
       bytes[i] = binaryString.charCodeAt(i);
     }
 
-    // Simple PDF text extraction - find text between stream/endstream and extract readable content
     const pdfText = new TextDecoder('latin1').decode(bytes);
-    
-    // Extract text from PDF streams (basic extraction)
     const textParts: string[] = [];
     
-    // Method 1: Look for text in parentheses (PDF string literals)
-    const stringMatches = pdfText.matchAll(/\(([^)]+)\)/g);
-    for (const match of stringMatches) {
-      const text = match[1]
-        .replace(/\\n/g, '\n')
-        .replace(/\\r/g, '')
-        .replace(/\\t/g, ' ')
-        .replace(/\\\(/g, '(')
-        .replace(/\\\)/g, ')')
-        .replace(/\\\\/g, '\\');
-      if (text.length > 2 && /[a-zA-Z]{2,}/.test(text)) {
-        textParts.push(text);
-      }
-    }
-    
-    // Method 2: Look for BT...ET text blocks with Tj/TJ operators
+    // Method 1: BT...ET text blocks with Tj/TJ operators (most reliable)
     const textBlockMatches = pdfText.matchAll(/BT\s*([\s\S]*?)\s*ET/g);
     for (const match of textBlockMatches) {
       const block = match[1];
-      // Extract text from Tj operators
       const tjMatches = block.matchAll(/\(([^)]*)\)\s*Tj/g);
       for (const tj of tjMatches) {
-        const text = tj[1].replace(/\\[nrt]/g, ' ');
-        if (text.length > 1) {
-          textParts.push(text);
-        }
+        const text = tj[1].replace(/\\[nrt]/g, ' ').replace(/\\\(/g, '(').replace(/\\\)/g, ')').replace(/\\\\/g, '\\');
+        if (text.length > 0) textParts.push(text);
       }
-      // Extract text from TJ arrays
       const arrayMatches = block.matchAll(/\[(.*?)\]\s*TJ/g);
       for (const arr of arrayMatches) {
         const parts = arr[1].matchAll(/\(([^)]*)\)/g);
         for (const part of parts) {
           if (part[1].length > 0) {
-            textParts.push(part[1]);
+            const cleaned = part[1].replace(/\\[nrt]/g, ' ').replace(/\\\(/g, '(').replace(/\\\)/g, ')');
+            textParts.push(cleaned);
           }
+        }
+      }
+    }
+    
+    // Method 2: Fallback - text in parentheses (only if method 1 didn't find enough)
+    if (textParts.join(' ').length < 50) {
+      const stringMatches = pdfText.matchAll(/\(([^)]{3,})\)/g);
+      for (const match of stringMatches) {
+        const text = match[1].replace(/\\[nrt]/g, ' ');
+        if (/[a-zA-Z]{2,}/.test(text)) {
+          textParts.push(text);
         }
       }
     }
     
     const extractedText = textParts.join(' ');
     
-    if (extractedText.length < 50) {
-      throw new Error("Could not extract sufficient text from PDF. The PDF may be scanned/image-based.");
+    if (extractedText.length < 20) {
+      throw new Error("Could not extract text from PDF. It may be scanned/image-based.");
     }
     
     return extractedText;
   } catch (error) {
     console.error("PDF extraction error:", error);
-    throw new Error("Failed to extract text from PDF. Please try uploading a text-based PDF or paste the content as text.");
+    throw new Error("Failed to extract text from PDF. Try pasting the content as text instead.");
   }
 }
 
@@ -127,19 +105,16 @@ serve(async (req) => {
 
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-
     const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!);
 
     let textContent = content;
     
-    // If PDF, extract text from base64
     if (sourceType === "pdf") {
       console.log("Extracting text from PDF...");
-      textContent = await extractPdfText(content);
+      textContent = extractPdfText(content);
       console.log("Extracted PDF text length:", textContent.length);
     }
 
-    // Clean the text
     const cleanedContent = cleanText(textContent);
     console.log("Cleaned content length:", cleanedContent.length);
 
@@ -156,7 +131,7 @@ serve(async (req) => {
         source_url: sourceUrl,
         content: cleanedContent,
         metadata: {
-          originalLength: sourceType === "pdf" ? textContent.length : content.length,
+          originalLength: content.length,
           cleanedLength: cleanedContent.length,
         },
       })
@@ -164,46 +139,42 @@ serve(async (req) => {
       .single();
 
     if (docError) {
-      console.error("Document insert error:", docError);
       throw new Error(`Failed to create document: ${docError.message}`);
     }
 
-    console.log("Document created:", document.id);
-
-    // Chunk the text
+    // Chunk the text with smaller chunks for better search
     const chunks = chunkText(cleanedContent);
     console.log("Created chunks:", chunks.length);
 
-    // Create chunk records
-    const chunkRecords = chunks.map((chunkContent, idx) => ({
-      document_id: document.id,
-      content: chunkContent,
-      chunk_index: idx,
-      token_count: estimateTokens(chunkContent),
-      metadata: {
-        wordCount: chunkContent.split(/\s+/).length,
-      },
-    }));
+    // Insert chunks in batches of 50 for speed
+    const batchSize = 50;
+    let totalInserted = 0;
+    
+    for (let i = 0; i < chunks.length; i += batchSize) {
+      const batch = chunks.slice(i, i + batchSize).map((chunkContent, idx) => ({
+        document_id: document.id,
+        content: chunkContent,
+        chunk_index: i + idx,
+        token_count: estimateTokens(chunkContent),
+        metadata: { wordCount: chunkContent.split(/\s+/).length },
+      }));
 
-    // Insert all chunks
-    console.log("Inserting chunks:", chunkRecords.length);
-    const { error: chunksError } = await supabase
-      .from("document_chunks")
-      .insert(chunkRecords);
+      const { error: chunksError } = await supabase
+        .from("document_chunks")
+        .insert(batch);
 
-    if (chunksError) {
-      console.error("Chunks insert error:", chunksError);
-      throw new Error(`Failed to insert chunks: ${chunksError.message}`);
+      if (chunksError) {
+        throw new Error(`Failed to insert chunks: ${chunksError.message}`);
+      }
+      totalInserted += batch.length;
     }
-
-    console.log("Document ingestion complete");
 
     return new Response(
       JSON.stringify({
         success: true,
         documentId: document.id,
-        chunksCreated: chunkRecords.length,
-        totalTokens: chunkRecords.reduce((sum, c) => sum + c.token_count, 0),
+        chunksCreated: totalInserted,
+        totalTokens: chunks.reduce((sum, c) => sum + estimateTokens(c), 0),
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
