@@ -20,6 +20,8 @@ export function RAGChat() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
+  const [documents, setDocuments] = useState<{ id: string; title: string }[]>([]);
+  const [selectedDocumentId, setSelectedDocumentId] = useState<string>("all");
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -32,6 +34,17 @@ export function RAGChat() {
       if (!error && data) setSessionId(data.id);
     };
     createSession();
+  }, []);
+
+  useEffect(() => {
+    const fetchDocuments = async () => {
+      const { data } = await supabase
+        .from("documents")
+        .select("id, title")
+        .order("created_at", { ascending: false });
+      if (data) setDocuments(data);
+    };
+    fetchDocuments();
   }, []);
 
   useEffect(() => {
