@@ -97,8 +97,7 @@ export function DocumentUpload({ onUploadComplete }: DocumentUploadProps) {
   };
 
   const extractPdfText = async (file: File): Promise<string> => {
-    // @ts-ignore - legacy build for Vite compatibility
-    const pdfjsLib = await import("pdfjs-dist/legacy/build/pdf.mjs");
+    const pdfjsLib = await import("pdfjs-dist");
     pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js`;
 
     const arrayBuffer = await file.arrayBuffer();
