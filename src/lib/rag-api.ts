@@ -35,6 +35,9 @@ export async function streamChat(
   callbacks: StreamCallbacks
 ): Promise<void> {
   try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
+
     const response = await fetch(CHAT_URL, {
       method: "POST",
       headers: {
@@ -42,7 +45,10 @@ export async function streamChat(
         Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
       },
       body: JSON.stringify({ message, sessionId }),
+      signal: controller.signal,
     });
+
+    clearTimeout(timeoutId);
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
