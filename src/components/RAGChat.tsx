@@ -66,7 +66,8 @@ export function RAGChat() {
 
       try {
         const startTime = Date.now();
-        const response = await sendChat(content, sessionId);
+        const docId = selectedDocumentId === "all" ? undefined : selectedDocumentId;
+        const response = await sendChat(content, sessionId, docId);
         const latencyMs = Date.now() - startTime;
 
         const assistantMessage: Message = {
