@@ -26,72 +26,35 @@ function chunkText(text: string, chunkSize = 300, overlap = 50): string[] {
 
 function cleanText(text: string): string {
   return text
+    .normalize("NFKD")
     .replace(/\r\n/g, '\n')
     .replace(/\n{3,}/g, '\n\n')
-    .replace(/\s{2,}/g, ' ')
-    .replace(/[^\x20-\x7E\n]/g, ' ')
+    // Remove non-printable chars but keep basic punctuation, letters, digits, whitespace
+    .replace(/[^\x20-\x7E\xA0-\xFF\n\u0100-\uFFFF]/g, ' ')
     .replace(/\s{2,}/g, ' ')
     .trim();
 }
 
-function estimateTokens(text: string): number {
-  return Math.ceil(text.length / 4);
+function isQualityChunk(text: string): boolean {
+  if (text.length < 20) return false;
+  
+  const words = text.split(/\s+/);
+  if (words.length < 5) return false;
+  
+  // Check ratio of alphabetic characters vs total
+  const alphaChars = (text.match(/[a-zA-Z]/g) || []).length;
+  const alphaRatio = alphaChars / text.length;
+  if (alphaRatio < 0.3) return false;
+  
+  // Check for garbled patterns (repeated short patterns)
+  const uniqueWords = new Set(words.map(w => w.toLowerCase()));
+  if (uniqueWords.size < words.length * 0.1 && words.length > 10) return false;
+  
+  return true;
 }
 
-function extractPdfText(base64Data: string): string {
-  try {
-    const binaryString = atob(base64Data);
-    const bytes = new Uint8Array(binaryString.length);
-    for (let i = 0; i < binaryString.length; i++) {
-      bytes[i] = binaryString.charCodeAt(i);
-    }
-
-    const pdfText = new TextDecoder('latin1').decode(bytes);
-    const textParts: string[] = [];
-    
-    // Method 1: BT...ET text blocks with Tj/TJ operators (most reliable)
-    const textBlockMatches = pdfText.matchAll(/BT\s*([\s\S]*?)\s*ET/g);
-    for (const match of textBlockMatches) {
-      const block = match[1];
-      const tjMatches = block.matchAll(/\(([^)]*)\)\s*Tj/g);
-      for (const tj of tjMatches) {
-        const text = tj[1].replace(/\\[nrt]/g, ' ').replace(/\\\(/g, '(').replace(/\\\)/g, ')').replace(/\\\\/g, '\\');
-        if (text.length > 0) textParts.push(text);
-      }
-      const arrayMatches = block.matchAll(/\[(.*?)\]\s*TJ/g);
-      for (const arr of arrayMatches) {
-        const parts = arr[1].matchAll(/\(([^)]*)\)/g);
-        for (const part of parts) {
-          if (part[1].length > 0) {
-            const cleaned = part[1].replace(/\\[nrt]/g, ' ').replace(/\\\(/g, '(').replace(/\\\)/g, ')');
-            textParts.push(cleaned);
-          }
-        }
-      }
-    }
-    
-    // Method 2: Fallback - text in parentheses (only if method 1 didn't find enough)
-    if (textParts.join(' ').length < 50) {
-      const stringMatches = pdfText.matchAll(/\(([^)]{3,})\)/g);
-      for (const match of stringMatches) {
-        const text = match[1].replace(/\\[nrt]/g, ' ');
-        if (/[a-zA-Z]{2,}/.test(text)) {
-          textParts.push(text);
-        }
-      }
-    }
-    
-    const extractedText = textParts.join(' ');
-    
-    if (extractedText.length < 20) {
-      throw new Error("Could not extract text from PDF. It may be scanned/image-based.");
-    }
-    
-    return extractedText;
-  } catch (error) {
-    console.error("PDF extraction error:", error);
-    throw new Error("Failed to extract text from PDF. Try pasting the content as text instead.");
-  }
+function estimateTokens(text: string): number {
+  return Math.ceil(text.length / 4);
 }
 
 serve(async (req) => {
@@ -107,19 +70,19 @@ serve(async (req) => {
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
     const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!);
 
-    let textContent = content;
-    
-    if (sourceType === "pdf") {
-      console.log("Extracting text from PDF...");
-      textContent = extractPdfText(content);
-      console.log("Extracted PDF text length:", textContent.length);
-    }
-
-    const cleanedContent = cleanText(textContent);
+    // Content is now always plain text (PDF extraction happens client-side)
+    const cleanedContent = cleanText(content);
     console.log("Cleaned content length:", cleanedContent.length);
 
     if (cleanedContent.length < 10) {
-      throw new Error("Document content is too short to process");
+      throw new Error("Document content is too short or unreadable");
+    }
+
+    // Check overall text quality
+    const alphaChars = (cleanedContent.match(/[a-zA-Z]/g) || []).length;
+    const alphaRatio = alphaChars / cleanedContent.length;
+    if (alphaRatio < 0.2) {
+      throw new Error("Document text quality is too low. The content appears garbled or non-textual.");
     }
 
     // Create document record
@@ -142,16 +105,23 @@ serve(async (req) => {
       throw new Error(`Failed to create document: ${docError.message}`);
     }
 
-    // Chunk the text with smaller chunks for better search
-    const chunks = chunkText(cleanedContent);
-    console.log("Created chunks:", chunks.length);
+    // Chunk and filter for quality
+    const rawChunks = chunkText(cleanedContent);
+    const qualityChunks = rawChunks.filter(isQualityChunk);
+    console.log(`Chunks: ${rawChunks.length} total, ${qualityChunks.length} quality`);
 
-    // Insert chunks in batches of 50 for speed
+    if (qualityChunks.length === 0) {
+      // Clean up the document if no quality chunks
+      await supabase.from("documents").delete().eq("id", document.id);
+      throw new Error("No readable content could be extracted from the document.");
+    }
+
+    // Insert chunks in batches
     const batchSize = 50;
     let totalInserted = 0;
     
-    for (let i = 0; i < chunks.length; i += batchSize) {
-      const batch = chunks.slice(i, i + batchSize).map((chunkContent, idx) => ({
+    for (let i = 0; i < qualityChunks.length; i += batchSize) {
+      const batch = qualityChunks.slice(i, i + batchSize).map((chunkContent, idx) => ({
         document_id: document.id,
         content: chunkContent,
         chunk_index: i + idx,
@@ -174,7 +144,7 @@ serve(async (req) => {
         success: true,
         documentId: document.id,
         chunksCreated: totalInserted,
-        totalTokens: chunks.reduce((sum, c) => sum + estimateTokens(c), 0),
+        totalTokens: qualityChunks.reduce((sum, c) => sum + estimateTokens(c), 0),
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
@@ -182,7 +152,7 @@ serve(async (req) => {
   } catch (error) {
     console.error("Ingest error:", error);
     return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }),
+      JSON.stringify({ success: false, error: error instanceof Error ? error.message : "Unknown error" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
