@@ -24,7 +24,8 @@ const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/rag-chat`;
 
 export async function sendChat(
   message: string,
-  sessionId: string
+  sessionId: string,
+  documentId?: string
 ): Promise<ChatResponse> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 30000);
