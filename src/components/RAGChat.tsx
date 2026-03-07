@@ -4,9 +4,7 @@ import { ChatMessage } from "./ChatMessage";
 import { ChatInput } from "./ChatInput";
 import { streamChat, Citation, ChatMetadata } from "@/lib/rag-api";
 import { supabase } from "@/integrations/supabase/client";
-import { Sparkles, Coins } from "lucide-react";
-import { useCredits } from "@/hooks/use-credits";
-import { useToast } from "@/hooks/use-toast";
+import { Sparkles } from "lucide-react";
 
 interface Message {
   id: string;
@@ -24,8 +22,6 @@ export function RAGChat() {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
-  const { credits, loading: creditsLoading, deductCredit, hasCredits } = useCredits();
-  const { toast } = useToast();
 
   // Create a new session on mount
   useEffect(() => {
@@ -51,27 +47,6 @@ export function RAGChat() {
   const handleSend = useCallback(
     async (content: string) => {
       if (!sessionId) return;
-
-      // Check credits before sending
-      if (!hasCredits) {
-        toast({
-          title: "No credits remaining",
-          description: "You've used all your free credits. Please subscribe for more.",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      // Deduct credit
-      const deducted = await deductCredit();
-      if (!deducted) {
-        toast({
-          title: "Failed to use credit",
-          description: "Please try again.",
-          variant: "destructive",
-        });
-        return;
-      }
 
       const userMessage: Message = {
         id: crypto.randomUUID(),
@@ -180,19 +155,11 @@ export function RAGChat() {
         setIsLoading(false);
       }
     },
-    [sessionId, hasCredits, deductCredit, toast]
+    [sessionId]
   );
 
   return (
     <div className="flex flex-col h-full">
-      {/* Credits display */}
-      <div className="px-4 py-2 border-b border-border/50 flex items-center justify-end gap-2">
-        <Coins className="w-4 h-4 text-primary" />
-        <span className="text-sm font-medium">
-          {creditsLoading ? "..." : `${credits ?? 0} credits`}
-        </span>
-      </div>
-      
       {/* Messages area */}
       <ScrollArea className="flex-1 px-4" ref={scrollRef}>
         <div className="max-w-3xl mx-auto py-6 space-y-6">
