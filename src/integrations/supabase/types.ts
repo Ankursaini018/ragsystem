@@ -128,6 +128,7 @@ export type Database = {
           metadata: Json | null
           source_type: string
           source_url: string | null
+          summary: string | null
           title: string
           updated_at: string
         }
@@ -138,6 +139,7 @@ export type Database = {
           metadata?: Json | null
           source_type: string
           source_url?: string | null
+          summary?: string | null
           title: string
           updated_at?: string
         }
@@ -148,6 +150,7 @@ export type Database = {
           metadata?: Json | null
           source_type?: string
           source_url?: string | null
+          summary?: string | null
           title?: string
           updated_at?: string
         }

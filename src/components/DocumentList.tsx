@@ -12,6 +12,7 @@ interface Document {
   source_type: string;
   source_url: string | null;
   created_at: string;
+  summary: string | null;
   chunk_count?: number;
 }
 
@@ -31,7 +32,7 @@ export function DocumentList({ refreshTrigger }: DocumentListProps) {
       // Fetch documents with chunk counts
       const { data: docs, error: docsError } = await supabase
         .from("documents")
-        .select("id, title, source_type, source_url, created_at")
+        .select("id, title, source_type, source_url, created_at, summary")
         .order("created_at", { ascending: false });
 
       if (docsError) throw docsError;
@@ -198,7 +199,12 @@ export function DocumentList({ refreshTrigger }: DocumentListProps) {
                     <p className="text-sm font-medium truncate" title={doc.title}>
                       {doc.title}
                     </p>
-                    <p className="text-xs text-muted-foreground">
+                    {doc.summary && (
+                      <p className="text-xs text-muted-foreground/80 mt-0.5 line-clamp-2">
+                        {doc.summary}
+                      </p>
+                    )}
+                    <p className="text-xs text-muted-foreground mt-0.5">
                       {doc.chunk_count} chunks • {formatDate(doc.created_at)}
                     </p>
                   </div>

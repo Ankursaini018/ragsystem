@@ -139,12 +139,47 @@ serve(async (req) => {
       totalInserted += batch.length;
     }
 
+    // Generate summary via AI
+    let summary = "";
+    try {
+      const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+      if (LOVABLE_API_KEY) {
+        const summaryText = cleanedContent.substring(0, 3000);
+        const llmResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${LOVABLE_API_KEY}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model: "google/gemini-2.5-flash-lite",
+            messages: [
+              { role: "system", content: "Summarize the following document in 1-2 sentences. Be concise and informative." },
+              { role: "user", content: summaryText },
+            ],
+            stream: false,
+            max_tokens: 100,
+          }),
+        });
+        if (llmResp.ok) {
+          const llmData = await llmResp.json();
+          summary = llmData.choices?.[0]?.message?.content || "";
+          if (summary) {
+            await supabase.from("documents").update({ summary }).eq("id", document.id);
+          }
+        }
+      }
+    } catch (e) {
+      console.error("Summary generation failed (non-fatal):", e);
+    }
+
     return new Response(
       JSON.stringify({
         success: true,
         documentId: document.id,
         chunksCreated: totalInserted,
         totalTokens: qualityChunks.reduce((sum, c) => sum + estimateTokens(c), 0),
+        summary,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
