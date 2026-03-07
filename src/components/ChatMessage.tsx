@@ -9,7 +9,6 @@ interface ChatMessageProps {
   citations?: Citation[];
   confidenceScore?: number;
   latencyMs?: number;
-  isStreaming?: boolean;
 }
 
 export function ChatMessage({
