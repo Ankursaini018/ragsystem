@@ -63,7 +63,7 @@ serve(async (req) => {
   }
 
   try {
-    const { title, content, sourceType, sourceUrl } = await req.json();
+    const { title, content, sourceType, sourceUrl, userId } = await req.json();
     console.log("Ingesting document:", title, "Type:", sourceType);
 
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
@@ -86,18 +86,21 @@ serve(async (req) => {
     }
 
     // Create document record
+    const insertData: Record<string, unknown> = {
+      title,
+      source_type: sourceType,
+      source_url: sourceUrl,
+      content: cleanedContent,
+      metadata: {
+        originalLength: content.length,
+        cleanedLength: cleanedContent.length,
+      },
+    };
+    if (userId) insertData.user_id = userId;
+
     const { data: document, error: docError } = await supabase
       .from("documents")
-      .insert({
-        title,
-        source_type: sourceType,
-        source_url: sourceUrl,
-        content: cleanedContent,
-        metadata: {
-          originalLength: content.length,
-          cleanedLength: cleanedContent.length,
-        },
-      })
+      .insert(insertData)
       .select()
       .single();
 
