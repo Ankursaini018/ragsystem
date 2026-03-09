@@ -20,6 +20,12 @@ const Landing = () => {
             <a href="#home" className="text-sm text-muted-foreground hover:text-foreground transition-colors hidden sm:block">Home</a>
             <a href="#about" className="text-sm text-muted-foreground hover:text-foreground transition-colors hidden sm:block">About</a>
             <a href="#how-it-works" className="text-sm text-muted-foreground hover:text-foreground transition-colors hidden sm:block">How it Works</a>
+            <Link to="/auth">
+              <Button variant="ghost" size="sm" className="gap-2">
+                <LogIn className="w-4 h-4" />
+                Login
+              </Button>
+            </Link>
             <Link to="/chat">
               <Button size="sm" className="gap-2">
                 <MessageSquare className="w-4 h-4" />
