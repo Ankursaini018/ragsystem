@@ -5,6 +5,7 @@ import { ChatMessage } from "./ChatMessage";
 import { ChatInput } from "./ChatInput";
 import { sendChat, Citation } from "@/lib/rag-api";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 import { Sparkles, FileText } from "lucide-react";
 
 interface Message {
@@ -23,18 +24,21 @@ export function RAGChat() {
   const [documents, setDocuments] = useState<{ id: string; title: string }[]>([]);
   const [selectedDocumentId, setSelectedDocumentId] = useState<string>("all");
   const bottomRef = useRef<HTMLDivElement>(null);
+  const { user } = useAuth();
 
   useEffect(() => {
     const createSession = async () => {
+      const insertData: any = { title: "New Chat" };
+      if (user) insertData.user_id = user.id;
       const { data, error } = await supabase
         .from("chat_sessions")
-        .insert({ title: "New Chat" })
+        .insert(insertData)
         .select()
         .single();
       if (!error && data) setSessionId(data.id);
     };
     createSession();
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     const fetchDocuments = async () => {
@@ -45,7 +49,7 @@ export function RAGChat() {
       if (data) setDocuments(data);
     };
     fetchDocuments();
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -81,7 +85,6 @@ export function RAGChat() {
 
         setMessages((prev) => [...prev, assistantMessage]);
 
-        // Save to database
         supabase
           .from("chat_messages")
           .insert([

@@ -86,18 +86,21 @@ serve(async (req) => {
     }
 
     // Create document record
+    const insertData: Record<string, unknown> = {
+      title,
+      source_type: sourceType,
+      source_url: sourceUrl,
+      content: cleanedContent,
+      metadata: {
+        originalLength: content.length,
+        cleanedLength: cleanedContent.length,
+      },
+    };
+    if (userId) insertData.user_id = userId;
+
     const { data: document, error: docError } = await supabase
       .from("documents")
-      .insert({
-        title,
-        source_type: sourceType,
-        source_url: sourceUrl,
-        content: cleanedContent,
-        metadata: {
-          originalLength: content.length,
-          cleanedLength: cleanedContent.length,
-        },
-      })
+      .insert(insertData)
       .select()
       .single();
 

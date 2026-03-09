@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Database, MessageSquare, FileText, Search, Sparkles, ArrowRight, Upload, Brain, CheckCircle } from "lucide-react";
+import { Database, MessageSquare, FileText, Search, Sparkles, ArrowRight, Upload, Brain, CheckCircle, LogIn } from "lucide-react";
 import { Scene3D } from "@/components/Scene3D";
 import { ScrollReveal, StaggerContainer, StaggerItem } from "@/components/ScrollReveal";
 

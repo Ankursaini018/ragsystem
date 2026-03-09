@@ -30,12 +30,16 @@ export async function sendChat(
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 30000);
 
+  // Get current session token if logged in
+  const { data: { session } } = await supabase.auth.getSession();
+  const token = session?.access_token || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+
   try {
     const response = await fetch(CHAT_URL, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+        Authorization: `Bearer ${token}`,
       },
       body: JSON.stringify({ message, sessionId, documentId }),
       signal: controller.signal,
@@ -70,8 +74,12 @@ export async function ingestDocument(
   sourceType: "pdf" | "text" | "url",
   sourceUrl?: string
 ): Promise<{ documentId: string; chunksCreated: number; totalTokens: number }> {
+  // Get current user id if logged in
+  const { data: { session } } = await supabase.auth.getSession();
+  const userId = session?.user?.id;
+
   const { data, error } = await supabase.functions.invoke("ingest-document", {
-    body: { title, content, sourceType, sourceUrl },
+    body: { title, content, sourceType, sourceUrl, userId },
   });
 
   if (error) {
