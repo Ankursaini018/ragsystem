@@ -63,7 +63,7 @@ serve(async (req) => {
   }
 
   try {
-    const { title, content, sourceType, sourceUrl } = await req.json();
+    const { title, content, sourceType, sourceUrl, userId } = await req.json();
     console.log("Ingesting document:", title, "Type:", sourceType);
 
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
