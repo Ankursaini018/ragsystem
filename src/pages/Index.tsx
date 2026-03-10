@@ -58,7 +58,7 @@ const Index = () => {
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
             <DocumentUpload onUploadComplete={handleUploadComplete} />
             <div className="glass-card p-4">
-              <DocumentList refreshTrigger={refreshTrigger} />
+              <DocumentList refreshTrigger={refreshTrigger} selectedDocumentId={selectedDocumentId} onSelectDocument={setSelectedDocumentId} />
             </div>
           </div>
 
