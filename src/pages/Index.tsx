@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 const Index = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [selectedDocumentId, setSelectedDocumentId] = useState("all");
 
   const handleUploadComplete = () => {
     setRefreshTrigger((prev) => prev + 1);
