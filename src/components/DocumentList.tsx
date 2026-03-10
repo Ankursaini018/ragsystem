@@ -184,7 +184,8 @@ export function DocumentList({ refreshTrigger, selectedDocumentId, onSelectDocum
         </Button>
       </div>
       <ScrollArea className="h-[300px] w-full" type="always">
-        <div className="space-y-2 min-w-[360px] pr-2">
+        <div className="min-w-[400px] pr-2">
+          <div className="space-y-2">
           {documents.map((doc) => (
             <div
               key={doc.id}
@@ -220,7 +221,7 @@ export function DocumentList({ refreshTrigger, selectedDocumentId, onSelectDocum
                   variant="ghost"
                   size="icon"
                   className="w-8 h-8 shrink-0 text-muted-foreground hover:text-destructive"
-                  onClick={() => handleDelete(doc.id)}
+                  onClick={(e) => { e.stopPropagation(); handleDelete(doc.id); }}
                   disabled={deletingId === doc.id}
                   aria-label={`Delete ${doc.title}`}
                 >
@@ -233,7 +234,9 @@ export function DocumentList({ refreshTrigger, selectedDocumentId, onSelectDocum
               </div>
             </div>
           ))}
+          </div>
         </div>
+        <ScrollBar orientation="horizontal" />
       </ScrollArea>
     </div>
   );
