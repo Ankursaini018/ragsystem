@@ -183,8 +183,8 @@ export function DocumentList({ refreshTrigger, selectedDocumentId, onSelectDocum
           <RefreshCw className="w-3 h-3" />
         </Button>
       </div>
-      <ScrollArea className="h-[300px] w-full">
-        <div className="space-y-2 pr-4">
+      <ScrollArea className="h-[300px] w-full" type="always">
+        <div className="space-y-2 min-w-[360px] pr-2">
           {documents.map((doc) => (
             <div
               key={doc.id}
