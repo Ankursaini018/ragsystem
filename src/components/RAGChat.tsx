@@ -8,6 +8,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Sparkles, FileText } from "lucide-react";
 
+interface RAGChatProps {
+  selectedDocumentId: string;
+  onSelectedDocumentChange: (id: string) => void;
+}
+
 interface Message {
   id: string;
   role: "user" | "assistant";
