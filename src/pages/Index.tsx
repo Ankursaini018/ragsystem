@@ -115,7 +115,7 @@ const Index = () => {
 
         {/* Chat area */}
         <div className="flex-1 overflow-hidden">
-          <RAGChat />
+          <RAGChat selectedDocumentId={selectedDocumentId} onSelectedDocumentChange={setSelectedDocumentId} />
         </div>
       </main>
     </div>
