@@ -22,12 +22,11 @@ interface Message {
   latencyMs?: number;
 }
 
-export function RAGChat() {
+export function RAGChat({ selectedDocumentId, onSelectedDocumentChange }: RAGChatProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [documents, setDocuments] = useState<{ id: string; title: string }[]>([]);
-  const [selectedDocumentId, setSelectedDocumentId] = useState<string>("all");
   const bottomRef = useRef<HTMLDivElement>(null);
   const { user } = useAuth();
 
