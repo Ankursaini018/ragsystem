@@ -171,7 +171,7 @@ export function RAGChat({ selectedDocumentId, onSelectedDocumentChange }: RAGCha
         <div className="max-w-3xl mx-auto space-y-2">
           <div className="flex items-center gap-2">
             <FileText className="w-4 h-4 text-muted-foreground" />
-            <Select value={selectedDocumentId} onValueChange={setSelectedDocumentId}>
+            <Select value={selectedDocumentId} onValueChange={onSelectedDocumentChange}>
               <SelectTrigger className="w-[220px] h-8 text-xs bg-secondary border-border/50">
                 <SelectValue placeholder="All documents" />
               </SelectTrigger>
