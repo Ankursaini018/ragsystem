@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 const Chat = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [selectedDocumentId, setSelectedDocumentId] = useState("all");
   const { user, isGuest, signOut } = useAuth();
 
   const handleUploadComplete = () => {
