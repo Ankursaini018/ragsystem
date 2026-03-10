@@ -18,6 +18,8 @@ interface Document {
 
 interface DocumentListProps {
   refreshTrigger: number;
+  selectedDocumentId?: string;
+  onSelectDocument?: (id: string) => void;
 }
 
 export function DocumentList({ refreshTrigger }: DocumentListProps) {
