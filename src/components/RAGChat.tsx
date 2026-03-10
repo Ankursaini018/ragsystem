@@ -8,6 +8,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Sparkles, FileText } from "lucide-react";
 
+interface RAGChatProps {
+  selectedDocumentId: string;
+  onSelectedDocumentChange: (id: string) => void;
+}
+
 interface Message {
   id: string;
   role: "user" | "assistant";
@@ -17,12 +22,11 @@ interface Message {
   latencyMs?: number;
 }
 
-export function RAGChat() {
+export function RAGChat({ selectedDocumentId, onSelectedDocumentChange }: RAGChatProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [documents, setDocuments] = useState<{ id: string; title: string }[]>([]);
-  const [selectedDocumentId, setSelectedDocumentId] = useState<string>("all");
   const bottomRef = useRef<HTMLDivElement>(null);
   const { user } = useAuth();
 
@@ -167,7 +171,7 @@ export function RAGChat() {
         <div className="max-w-3xl mx-auto space-y-2">
           <div className="flex items-center gap-2">
             <FileText className="w-4 h-4 text-muted-foreground" />
-            <Select value={selectedDocumentId} onValueChange={setSelectedDocumentId}>
+            <Select value={selectedDocumentId} onValueChange={onSelectedDocumentChange}>
               <SelectTrigger className="w-[220px] h-8 text-xs bg-secondary border-border/50">
                 <SelectValue placeholder="All documents" />
               </SelectTrigger>

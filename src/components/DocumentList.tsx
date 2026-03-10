@@ -18,9 +18,11 @@ interface Document {
 
 interface DocumentListProps {
   refreshTrigger: number;
+  selectedDocumentId?: string;
+  onSelectDocument?: (id: string) => void;
 }
 
-export function DocumentList({ refreshTrigger }: DocumentListProps) {
+export function DocumentList({ refreshTrigger, selectedDocumentId, onSelectDocument }: DocumentListProps) {
   const [documents, setDocuments] = useState<Document[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -186,8 +188,12 @@ export function DocumentList({ refreshTrigger }: DocumentListProps) {
           {documents.map((doc) => (
             <div
               key={doc.id}
+              onClick={() => onSelectDocument?.(doc.id === selectedDocumentId ? "all" : doc.id)}
               className={cn(
-                "doc-card w-full p-3 rounded-lg bg-muted/30 border border-border/50"
+                "doc-card w-full p-3 rounded-lg border cursor-pointer transition-colors",
+                doc.id === selectedDocumentId
+                  ? "bg-primary/10 border-primary/50 ring-1 ring-primary/30"
+                  : "bg-muted/30 border-border/50 hover:bg-muted/50"
               )}
             >
               <div className="flex items-center justify-between gap-3">

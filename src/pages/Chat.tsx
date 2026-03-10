@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 const Chat = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [selectedDocumentId, setSelectedDocumentId] = useState("all");
   const { user, isGuest, signOut } = useAuth();
 
   const handleUploadComplete = () => {
@@ -51,7 +52,7 @@ const Chat = () => {
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
             <DocumentUpload onUploadComplete={handleUploadComplete} />
             <div className="glass-card p-4">
-              <DocumentList refreshTrigger={refreshTrigger} />
+              <DocumentList refreshTrigger={refreshTrigger} selectedDocumentId={selectedDocumentId} onSelectDocument={setSelectedDocumentId} />
             </div>
           </div>
 
@@ -109,7 +110,7 @@ const Chat = () => {
         </header>
 
         <div className="flex-1 overflow-hidden">
-          <RAGChat />
+          <RAGChat selectedDocumentId={selectedDocumentId} onSelectedDocumentChange={setSelectedDocumentId} />
         </div>
       </main>
     </div>
