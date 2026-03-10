@@ -22,7 +22,7 @@ interface DocumentListProps {
   onSelectDocument?: (id: string) => void;
 }
 
-export function DocumentList({ refreshTrigger }: DocumentListProps) {
+export function DocumentList({ refreshTrigger, selectedDocumentId, onSelectDocument }: DocumentListProps) {
   const [documents, setDocuments] = useState<Document[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
