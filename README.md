@@ -1,73 +1,110 @@
-# Welcome to your Lovable project
+# 🚀 Sourceful Answers – AI Document Assistant (RAG)
 
-## Project info
+An AI-powered document question-answering system built using **Retrieval-Augmented Generation (RAG)**.
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+Upload documents and ask questions in natural language. The system retrieves relevant information and generates accurate answers with **source citations**.
 
-## How can I edit this code?
+---
 
-There are several ways of editing your application.
+## 🌐 Live Demo
 
-**Use Lovable**
+🔗 https://ragsystem.lovable.app
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
+---
 
-Changes made via Lovable will be committed automatically to this repo.
+## ✨ Features
 
-**Use your preferred IDE**
+- 📄 Upload PDF documents  
+- 💬 Ask questions in natural language  
+- 🔍 Intelligent retrieval using vector search  
+- 📌 Answers with source citations  
+- 📚 Multi-document support  
+- ⚡ Fast and optimized RAG pipeline  
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+---
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+## 🧠 How It Works (RAG Pipeline)
 
-Follow these steps:
+1. Document Upload  
+2. Text Extraction & Chunking  
+3. Embedding Generation  
+4. Vector Database Storage  
+5. Query Processing  
+6. Relevant Chunk Retrieval  
+7. LLM-based Answer Generation with Sources  
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+---
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+## 🏗️ Architecture
+User Query
+↓
+Vector Search (Embeddings)
+↓
+Retrieve Relevant Chunks
+↓
+LLM (Answer Generation)
+↓
+Response + Citations
 
-# Step 3: Install the necessary dependencies.
-npm i
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
-```
+---
 
-**Edit a file directly in GitHub**
+## 📸 Screenshots
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+### 🏠 Home Page
+![Home](screenshots/home.png)
 
-**Use GitHub Codespaces**
+### ℹ️ About Section
+![About](screenshots/about.png)
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+### ⚙️ How It Works
+![How It Works](screenshots/howitworks.png)
 
-## What technologies are used for this project?
+### 🔐 Authentication (Login / Sign Up)
+![Auth](screenshots/auth.png)
 
-This project is built with:
+### 💬 RAG Chat Interface
+![Chat](screenshots/chat.png)
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+---
 
-## How can I deploy this project?
+## 🛠️ Tech Stack
 
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
+- Python  
+- Machine Learning  
+- Retrieval-Augmented Generation (RAG)  
+- Vector Embeddings  
+- LLM Integration  
+- PDF Processing  
+- Web-based Interface  
 
-## Can I connect a custom domain to my Lovable project?
+---
 
-Yes, you can!
+## 💡 Example Queries
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+- "Summarize this document"  
+- "What skills are mentioned in this CV?"  
+- "Explain the joining letter terms"  
+- "Compare multiple documents"  
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+---
+
+## 🚀 Future Improvements
+
+- Document filtering (select specific file)  
+- User authentication & personal storage  
+- API integration  
+- Advanced semantic search  
+
+---
+
+## 👨‍💻 Author
+
+**Ankur Saini**  
+AI/ML & Data Science Engineer 
+
+---
+
+## ⭐ Support
+
+If you found this project helpful, consider giving it a ⭐ on GitHub!
