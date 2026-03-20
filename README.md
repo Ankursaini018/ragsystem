@@ -52,19 +52,24 @@ Response + Citations
 ## 📸 Screenshots
 
 ### 🏠 Home Page
-![Home](screenshots/home.png)
+<img width="1627" height="918" alt="Screenshot 2026-03-21 011330" src="https://github.com/user-attachments/assets/2d7890f6-d640-42d1-a19f-d6d1a3304bae" />
+
 
 ### ℹ️ About Section
-![About](screenshots/about.png)
+<img width="1726" height="706" alt="Screenshot 2026-03-21 011403" src="https://github.com/user-attachments/assets/c08219c2-5fc6-4674-9514-7ae267cc04bb" />
+
 
 ### ⚙️ How It Works
-![How It Works](screenshots/howitworks.png)
+<img width="1196" height="904" alt="Screenshot 2026-03-21 011429" src="https://github.com/user-attachments/assets/527e2355-dc26-4098-9a26-1faa4925189d" />
+
 
 ### 🔐 Authentication (Login / Sign Up)
-![Auth](screenshots/auth.png)
+<img width="751" height="881" alt="Screenshot 2026-03-21 011445" src="https://github.com/user-attachments/assets/6304ef1d-df39-49b4-9721-da5ffa0290d5" />
+
 
 ### 💬 RAG Chat Interface
-![Chat](screenshots/chat.png)
+<img width="1901" height="915" alt="Screenshot 2026-03-21 011515" src="https://github.com/user-attachments/assets/227ac630-fb69-4fd2-9000-d8deb6d1b3ab" />
+
 
 ---
 
