@@ -112,6 +112,15 @@ export async function fetchUrlContent(
     throw new Error(data.error || "Failed to fetch URL");
   }
 
+export async function extractHandwriting(images: string[]): Promise<string> {
+  const { data, error } = await supabase.functions.invoke("extract-handwriting", {
+    body: { images },
+  });
+  if (error) throw new Error(error.message);
+  if (!data?.success) throw new Error(data?.error || "Handwriting extraction failed");
+  return data.text as string;
+}
+
   return {
     title: data.title,
     content: data.content,
