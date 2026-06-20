@@ -120,6 +120,26 @@ export function DocumentUpload({ onUploadComplete }: DocumentUploadProps) {
     });
   };
 
+  const renderPdfPagesToImages = async (file: File, maxPages = 20): Promise<string[]> => {
+    const pdfjsLib = await loadPdfJs();
+    const arrayBuffer = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+    const images: string[] = [];
+    const total = Math.min(pdf.numPages, maxPages);
+    for (let i = 1; i <= total; i++) {
+      const page = await pdf.getPage(i);
+      const viewport = page.getViewport({ scale: 2 });
+      const canvas = document.createElement("canvas");
+      canvas.width = viewport.width;
+      canvas.height = viewport.height;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) continue;
+      await page.render({ canvasContext: ctx, viewport }).promise;
+      images.push(canvas.toDataURL("image/jpeg", 0.85));
+    }
+    return images;
+  };
+
   const extractPdfText = async (file: File): Promise<string> => {
     const pdfjsLib = await loadPdfJs();
 
@@ -140,10 +160,73 @@ export function DocumentUpload({ onUploadComplete }: DocumentUploadProps) {
 
     const fullText = textParts.join("\n\n");
     if (fullText.trim().length < 20) {
-      throw new Error("Could not extract readable text from PDF. It may be a scanned/image-based document.");
+      // Fallback: scanned / handwritten PDF — OCR pages via vision model.
+      toast({
+        title: "Scanned PDF detected",
+        description: "Running handwriting/OCR on pages — this can take a moment...",
+      });
+      const images = await renderPdfPagesToImages(file);
+      if (images.length === 0) {
+        throw new Error("Could not render PDF pages for OCR.");
+      }
+      const ocrText = await extractHandwriting(images);
+      if (ocrText.trim().length < 20) {
+        throw new Error("OCR could not read this PDF.");
+      }
+      return ocrText;
     }
     return fullText;
   };
+
+  const fileToDataUrl = (file: File): Promise<string> =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = () => reject(new Error("Failed to read file"));
+      reader.readAsDataURL(file);
+    });
+
+  const handleHandwritingUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files ?? []);
+    if (files.length === 0) return;
+
+    const invalid = files.find((f) => !f.type.startsWith("image/"));
+    if (invalid) {
+      toast({
+        title: "Unsupported file",
+        description: "Please upload image files only (JPG, PNG, WEBP, HEIC).",
+        variant: "destructive",
+      });
+      if (handwritingInputRef.current) handwritingInputRef.current.value = "";
+      return;
+    }
+
+    const title = handwritingTitle.trim() || files[0].name.replace(/\.[^.]+$/, "") || "Handwritten note";
+
+    setIsUploading(true);
+    try {
+      const images = await Promise.all(files.map(fileToDataUrl));
+      const text = await extractHandwriting(images);
+      const result = await ingestDocument(title, text, "text");
+      setUploadResult({ title, chunks: result.chunksCreated });
+      setHandwritingTitle("");
+      toast({
+        title: "Handwriting transcribed",
+        description: `Created ${result.chunksCreated} chunks from "${title}"`,
+      });
+      onUploadComplete();
+    } catch (error) {
+      toast({
+        title: "Handwriting OCR failed",
+        description: error instanceof Error ? error.message : "Unknown error",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUploading(false);
+      if (handwritingInputRef.current) handwritingInputRef.current.value = "";
+    }
+  };
+
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
