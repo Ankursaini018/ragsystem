@@ -16,11 +16,13 @@ export function DocumentUpload({ onUploadComplete }: DocumentUploadProps) {
   const [textTitle, setTextTitle] = useState("");
   const [textContent, setTextContent] = useState("");
   const [url, setUrl] = useState("");
+  const [handwritingTitle, setHandwritingTitle] = useState("");
   const [uploadResult, setUploadResult] = useState<{
     title: string;
     chunks: number;
   } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const handwritingInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
   const handleTextUpload = async () => {
