@@ -307,7 +307,7 @@ export function DocumentUpload({ onUploadComplete }: DocumentUploadProps) {
       )}
 
       <Tabs defaultValue="text" className="w-full">
-        <TabsList className="w-full grid grid-cols-3 bg-muted/50">
+        <TabsList className="w-full grid grid-cols-4 bg-muted/50">
           <TabsTrigger value="text" className="text-xs">
             <FileText className="w-3 h-3 mr-1" />
             Text
@@ -315,6 +315,10 @@ export function DocumentUpload({ onUploadComplete }: DocumentUploadProps) {
           <TabsTrigger value="file" className="text-xs">
             <Upload className="w-3 h-3 mr-1" />
             File
+          </TabsTrigger>
+          <TabsTrigger value="handwriting" className="text-xs">
+            <PenLine className="w-3 h-3 mr-1" />
+            Notes
           </TabsTrigger>
           <TabsTrigger value="url" className="text-xs">
             <Link className="w-3 h-3 mr-1" />
