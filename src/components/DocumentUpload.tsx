@@ -386,6 +386,46 @@ export function DocumentUpload({ onUploadComplete }: DocumentUploadProps) {
           </Button>
         </TabsContent>
 
+        <TabsContent value="handwriting" className="space-y-3 mt-3">
+          <Input
+            placeholder="Notes title (optional)"
+            value={handwritingTitle}
+            onChange={(e) => setHandwritingTitle(e.target.value)}
+            disabled={isUploading}
+          />
+          <input
+            ref={handwritingInputRef}
+            type="file"
+            accept="image/*"
+            multiple
+            onChange={handleHandwritingUpload}
+            className="hidden"
+          />
+          <Button
+            variant="outline"
+            onClick={() => handwritingInputRef.current?.click()}
+            disabled={isUploading}
+            className="w-full h-20 border-dashed"
+          >
+            {isUploading ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Transcribing handwriting...
+              </>
+            ) : (
+              <div className="flex flex-col items-center gap-1">
+                <PenLine className="w-5 h-5 text-muted-foreground" />
+                <span className="text-xs text-muted-foreground">
+                  Upload photos/scans of handwritten notes
+                </span>
+                <span className="text-[10px] text-muted-foreground/70">
+                  JPG, PNG, WEBP • multiple pages supported
+                </span>
+              </div>
+            )}
+          </Button>
+        </TabsContent>
+
         <TabsContent value="url" className="space-y-3 mt-3">
           <Input
             placeholder="https://example.com/article"
