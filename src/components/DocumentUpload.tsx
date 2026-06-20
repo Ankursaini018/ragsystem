@@ -1,11 +1,11 @@
 import { useState, useRef } from "react";
-import { Upload, Link, FileText, Loader2, X, CheckCircle } from "lucide-react";
+import { Upload, Link, FileText, Loader2, X, CheckCircle, PenLine } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { ingestDocument, fetchUrlContent } from "@/lib/rag-api";
+import { ingestDocument, fetchUrlContent, extractHandwriting } from "@/lib/rag-api";
 
 interface DocumentUploadProps {
   onUploadComplete: () => void;
@@ -16,11 +16,13 @@ export function DocumentUpload({ onUploadComplete }: DocumentUploadProps) {
   const [textTitle, setTextTitle] = useState("");
   const [textContent, setTextContent] = useState("");
   const [url, setUrl] = useState("");
+  const [handwritingTitle, setHandwritingTitle] = useState("");
   const [uploadResult, setUploadResult] = useState<{
     title: string;
     chunks: number;
   } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const handwritingInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
   const handleTextUpload = async () => {
@@ -118,6 +120,26 @@ export function DocumentUpload({ onUploadComplete }: DocumentUploadProps) {
     });
   };
 
+  const renderPdfPagesToImages = async (file: File, maxPages = 20): Promise<string[]> => {
+    const pdfjsLib = await loadPdfJs();
+    const arrayBuffer = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+    const images: string[] = [];
+    const total = Math.min(pdf.numPages, maxPages);
+    for (let i = 1; i <= total; i++) {
+      const page = await pdf.getPage(i);
+      const viewport = page.getViewport({ scale: 2 });
+      const canvas = document.createElement("canvas");
+      canvas.width = viewport.width;
+      canvas.height = viewport.height;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) continue;
+      await page.render({ canvasContext: ctx, viewport }).promise;
+      images.push(canvas.toDataURL("image/jpeg", 0.85));
+    }
+    return images;
+  };
+
   const extractPdfText = async (file: File): Promise<string> => {
     const pdfjsLib = await loadPdfJs();
 
@@ -138,10 +160,73 @@ export function DocumentUpload({ onUploadComplete }: DocumentUploadProps) {
 
     const fullText = textParts.join("\n\n");
     if (fullText.trim().length < 20) {
-      throw new Error("Could not extract readable text from PDF. It may be a scanned/image-based document.");
+      // Fallback: scanned / handwritten PDF — OCR pages via vision model.
+      toast({
+        title: "Scanned PDF detected",
+        description: "Running handwriting/OCR on pages — this can take a moment...",
+      });
+      const images = await renderPdfPagesToImages(file);
+      if (images.length === 0) {
+        throw new Error("Could not render PDF pages for OCR.");
+      }
+      const ocrText = await extractHandwriting(images);
+      if (ocrText.trim().length < 20) {
+        throw new Error("OCR could not read this PDF.");
+      }
+      return ocrText;
     }
     return fullText;
   };
+
+  const fileToDataUrl = (file: File): Promise<string> =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = () => reject(new Error("Failed to read file"));
+      reader.readAsDataURL(file);
+    });
+
+  const handleHandwritingUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files ?? []);
+    if (files.length === 0) return;
+
+    const invalid = files.find((f) => !f.type.startsWith("image/"));
+    if (invalid) {
+      toast({
+        title: "Unsupported file",
+        description: "Please upload image files only (JPG, PNG, WEBP, HEIC).",
+        variant: "destructive",
+      });
+      if (handwritingInputRef.current) handwritingInputRef.current.value = "";
+      return;
+    }
+
+    const title = handwritingTitle.trim() || files[0].name.replace(/\.[^.]+$/, "") || "Handwritten note";
+
+    setIsUploading(true);
+    try {
+      const images = await Promise.all(files.map(fileToDataUrl));
+      const text = await extractHandwriting(images);
+      const result = await ingestDocument(title, text, "text");
+      setUploadResult({ title, chunks: result.chunksCreated });
+      setHandwritingTitle("");
+      toast({
+        title: "Handwriting transcribed",
+        description: `Created ${result.chunksCreated} chunks from "${title}"`,
+      });
+      onUploadComplete();
+    } catch (error) {
+      toast({
+        title: "Handwriting OCR failed",
+        description: error instanceof Error ? error.message : "Unknown error",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUploading(false);
+      if (handwritingInputRef.current) handwritingInputRef.current.value = "";
+    }
+  };
+
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -222,7 +307,7 @@ export function DocumentUpload({ onUploadComplete }: DocumentUploadProps) {
       )}
 
       <Tabs defaultValue="text" className="w-full">
-        <TabsList className="w-full grid grid-cols-3 bg-muted/50">
+        <TabsList className="w-full grid grid-cols-4 bg-muted/50">
           <TabsTrigger value="text" className="text-xs">
             <FileText className="w-3 h-3 mr-1" />
             Text
@@ -230,6 +315,10 @@ export function DocumentUpload({ onUploadComplete }: DocumentUploadProps) {
           <TabsTrigger value="file" className="text-xs">
             <Upload className="w-3 h-3 mr-1" />
             File
+          </TabsTrigger>
+          <TabsTrigger value="handwriting" className="text-xs">
+            <PenLine className="w-3 h-3 mr-1" />
+            Notes
           </TabsTrigger>
           <TabsTrigger value="url" className="text-xs">
             <Link className="w-3 h-3 mr-1" />
@@ -291,6 +380,46 @@ export function DocumentUpload({ onUploadComplete }: DocumentUploadProps) {
                 <Upload className="w-5 h-5 text-muted-foreground" />
                 <span className="text-xs text-muted-foreground">
                   Click to upload PDF, TXT, or MD files
+                </span>
+              </div>
+            )}
+          </Button>
+        </TabsContent>
+
+        <TabsContent value="handwriting" className="space-y-3 mt-3">
+          <Input
+            placeholder="Notes title (optional)"
+            value={handwritingTitle}
+            onChange={(e) => setHandwritingTitle(e.target.value)}
+            disabled={isUploading}
+          />
+          <input
+            ref={handwritingInputRef}
+            type="file"
+            accept="image/*"
+            multiple
+            onChange={handleHandwritingUpload}
+            className="hidden"
+          />
+          <Button
+            variant="outline"
+            onClick={() => handwritingInputRef.current?.click()}
+            disabled={isUploading}
+            className="w-full h-20 border-dashed"
+          >
+            {isUploading ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Transcribing handwriting...
+              </>
+            ) : (
+              <div className="flex flex-col items-center gap-1">
+                <PenLine className="w-5 h-5 text-muted-foreground" />
+                <span className="text-xs text-muted-foreground">
+                  Upload photos/scans of handwritten notes
+                </span>
+                <span className="text-[10px] text-muted-foreground/70">
+                  JPG, PNG, WEBP • multiple pages supported
                 </span>
               </div>
             )}
