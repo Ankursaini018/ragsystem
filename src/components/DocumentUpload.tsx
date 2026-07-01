@@ -16,6 +16,7 @@ export function DocumentUpload({ onUploadComplete }: DocumentUploadProps) {
   const [textTitle, setTextTitle] = useState("");
   const [textContent, setTextContent] = useState("");
   const [url, setUrl] = useState("");
+  const [youtubeUrl, setYoutubeUrl] = useState("");
   const [handwritingTitle, setHandwritingTitle] = useState("");
   const [uploadResult, setUploadResult] = useState<{
     title: string;
