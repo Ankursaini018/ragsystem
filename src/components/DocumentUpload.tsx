@@ -481,6 +481,36 @@ export function DocumentUpload({ onUploadComplete }: DocumentUploadProps) {
             )}
           </Button>
         </TabsContent>
+
+        <TabsContent value="youtube" className="space-y-3 mt-3">
+          <Input
+            placeholder="https://youtube.com/watch?v=..."
+            value={youtubeUrl}
+            onChange={(e) => setYoutubeUrl(e.target.value)}
+            disabled={isUploading}
+            type="url"
+          />
+          <Button
+            onClick={handleYoutubeUpload}
+            disabled={isUploading || !youtubeUrl.trim()}
+            className="w-full"
+          >
+            {isUploading ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Fetching transcript...
+              </>
+            ) : (
+              <>
+                <Youtube className="w-4 h-4 mr-2" />
+                Fetch Transcript
+              </>
+            )}
+          </Button>
+          <p className="text-[10px] text-muted-foreground/70 text-center">
+            Uses captions/subtitles. Videos without captions can't be processed.
+          </p>
+        </TabsContent>
       </Tabs>
     </div>
   );
