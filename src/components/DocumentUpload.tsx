@@ -99,6 +99,33 @@ export function DocumentUpload({ onUploadComplete }: DocumentUploadProps) {
     }
   };
 
+  const handleYoutubeUpload = async () => {
+    if (!youtubeUrl.trim()) {
+      toast({ title: "Missing URL", description: "Paste a YouTube video URL.", variant: "destructive" });
+      return;
+    }
+    setIsUploading(true);
+    try {
+      const yt = await fetchYoutubeTranscript(youtubeUrl);
+      const result = await ingestDocument(yt.title, yt.content, "url", yt.url);
+      setUploadResult({ title: yt.title, chunks: result.chunksCreated });
+      setYoutubeUrl("");
+      toast({
+        title: "YouTube transcript ingested",
+        description: `Created ${result.chunksCreated} chunks from "${yt.title}"`,
+      });
+      onUploadComplete();
+    } catch (error) {
+      toast({
+        title: "YouTube fetch failed",
+        description: error instanceof Error ? error.message : "Unknown error",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
   const loadPdfJs = (): Promise<any> => {
     return new Promise((resolve, reject) => {
       if ((window as any).pdfjsLib) {
