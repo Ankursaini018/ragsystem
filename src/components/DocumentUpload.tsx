@@ -1,11 +1,11 @@
 import { useState, useRef } from "react";
-import { Upload, Link, FileText, Loader2, X, CheckCircle, PenLine } from "lucide-react";
+import { Upload, Link, FileText, Loader2, X, CheckCircle, PenLine, Youtube } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { ingestDocument, fetchUrlContent, extractHandwriting } from "@/lib/rag-api";
+import { ingestDocument, fetchUrlContent, extractHandwriting, fetchYoutubeTranscript } from "@/lib/rag-api";
 
 interface DocumentUploadProps {
   onUploadComplete: () => void;
@@ -16,6 +16,7 @@ export function DocumentUpload({ onUploadComplete }: DocumentUploadProps) {
   const [textTitle, setTextTitle] = useState("");
   const [textContent, setTextContent] = useState("");
   const [url, setUrl] = useState("");
+  const [youtubeUrl, setYoutubeUrl] = useState("");
   const [handwritingTitle, setHandwritingTitle] = useState("");
   const [uploadResult, setUploadResult] = useState<{
     title: string;
@@ -90,6 +91,33 @@ export function DocumentUpload({ onUploadComplete }: DocumentUploadProps) {
     } catch (error) {
       toast({
         title: "URL fetch failed",
+        description: error instanceof Error ? error.message : "Unknown error",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleYoutubeUpload = async () => {
+    if (!youtubeUrl.trim()) {
+      toast({ title: "Missing URL", description: "Paste a YouTube video URL.", variant: "destructive" });
+      return;
+    }
+    setIsUploading(true);
+    try {
+      const yt = await fetchYoutubeTranscript(youtubeUrl);
+      const result = await ingestDocument(yt.title, yt.content, "url", yt.url);
+      setUploadResult({ title: yt.title, chunks: result.chunksCreated });
+      setYoutubeUrl("");
+      toast({
+        title: "YouTube transcript ingested",
+        description: `Created ${result.chunksCreated} chunks from "${yt.title}"`,
+      });
+      onUploadComplete();
+    } catch (error) {
+      toast({
+        title: "YouTube fetch failed",
         description: error instanceof Error ? error.message : "Unknown error",
         variant: "destructive",
       });
@@ -307,7 +335,7 @@ export function DocumentUpload({ onUploadComplete }: DocumentUploadProps) {
       )}
 
       <Tabs defaultValue="text" className="w-full">
-        <TabsList className="w-full grid grid-cols-4 bg-muted/50">
+        <TabsList className="w-full grid grid-cols-5 bg-muted/50">
           <TabsTrigger value="text" className="text-xs">
             <FileText className="w-3 h-3 mr-1" />
             Text
@@ -323,6 +351,10 @@ export function DocumentUpload({ onUploadComplete }: DocumentUploadProps) {
           <TabsTrigger value="url" className="text-xs">
             <Link className="w-3 h-3 mr-1" />
             URL
+          </TabsTrigger>
+          <TabsTrigger value="youtube" className="text-xs">
+            <Youtube className="w-3 h-3 mr-1" />
+            YouTube
           </TabsTrigger>
         </TabsList>
 
@@ -448,6 +480,36 @@ export function DocumentUpload({ onUploadComplete }: DocumentUploadProps) {
               "Fetch & Add"
             )}
           </Button>
+        </TabsContent>
+
+        <TabsContent value="youtube" className="space-y-3 mt-3">
+          <Input
+            placeholder="https://youtube.com/watch?v=..."
+            value={youtubeUrl}
+            onChange={(e) => setYoutubeUrl(e.target.value)}
+            disabled={isUploading}
+            type="url"
+          />
+          <Button
+            onClick={handleYoutubeUpload}
+            disabled={isUploading || !youtubeUrl.trim()}
+            className="w-full"
+          >
+            {isUploading ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Fetching transcript...
+              </>
+            ) : (
+              <>
+                <Youtube className="w-4 h-4 mr-2" />
+                Fetch Transcript
+              </>
+            )}
+          </Button>
+          <p className="text-[10px] text-muted-foreground/70 text-center">
+            Uses captions/subtitles. Videos without captions can't be processed.
+          </p>
         </TabsContent>
       </Tabs>
     </div>
