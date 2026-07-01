@@ -119,6 +119,17 @@ export async function fetchUrlContent(
   };
 }
 
+export async function fetchYoutubeTranscript(
+  url: string
+): Promise<{ title: string; content: string; url: string }> {
+  const { data, error } = await supabase.functions.invoke("fetch-youtube", {
+    body: { url },
+  });
+  if (error) throw new Error(error.message);
+  if (!data?.success) throw new Error(data?.error || "Failed to fetch YouTube transcript");
+  return { title: data.title, content: data.content, url: data.url };
+}
+
 export async function extractHandwriting(images: string[]): Promise<string> {
   const { data, error } = await supabase.functions.invoke("extract-handwriting", {
     body: { images },
