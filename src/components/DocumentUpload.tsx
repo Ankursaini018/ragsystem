@@ -335,7 +335,7 @@ export function DocumentUpload({ onUploadComplete }: DocumentUploadProps) {
       )}
 
       <Tabs defaultValue="text" className="w-full">
-        <TabsList className="w-full grid grid-cols-4 bg-muted/50">
+        <TabsList className="w-full grid grid-cols-5 bg-muted/50">
           <TabsTrigger value="text" className="text-xs">
             <FileText className="w-3 h-3 mr-1" />
             Text
@@ -351,6 +351,10 @@ export function DocumentUpload({ onUploadComplete }: DocumentUploadProps) {
           <TabsTrigger value="url" className="text-xs">
             <Link className="w-3 h-3 mr-1" />
             URL
+          </TabsTrigger>
+          <TabsTrigger value="youtube" className="text-xs">
+            <Youtube className="w-3 h-3 mr-1" />
+            YouTube
           </TabsTrigger>
         </TabsList>
 
