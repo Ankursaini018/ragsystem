@@ -1,11 +1,11 @@
 import { useState, useRef } from "react";
-import { Upload, Link, FileText, Loader2, X, CheckCircle, PenLine } from "lucide-react";
+import { Upload, Link, FileText, Loader2, X, CheckCircle, PenLine, Youtube } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { ingestDocument, fetchUrlContent, extractHandwriting } from "@/lib/rag-api";
+import { ingestDocument, fetchUrlContent, extractHandwriting, fetchYoutubeTranscript } from "@/lib/rag-api";
 
 interface DocumentUploadProps {
   onUploadComplete: () => void;
